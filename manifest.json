@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "crueber.rpgdice",
+  "name": "RPG Dice",
+  "version": "1.0.0",
+  "author": "Christopher Rueber",
+  "license": "MIT",
+  "description": "Dice roller for tabletop RPGs: standard polyhedral dice, Fate dice, and user-defined custom dice.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "RPG Dice",
+    "description": "Roll standard, Fate, and custom dice",
+    "category": "Utility",
+    "allowMultiple": false,
+    "defaultSection": "center"
+  }
+}
