@@ -34,7 +34,7 @@ function rollSides(sides) {
 function rollDie(die) {
   if (die.kind === "fate") {
     var face = rollFate()
-    return { label: die.label, display: face === "" ? "0" : face, value: null }
+    return { label: die.label, display: face, value: null }
   }
   if (die.kind === "sides") {
     var s = rollSides(die.sides)
@@ -143,18 +143,20 @@ function pendingLabel(pending) {
 
 // "d6: 3, 4, 5   d8: 8" — same-type dice grouped, values comma-separated.
 function groupLabel(group) {
-  var order = []
-  var byLabel = Object.create(null)
+  var labels = []
+  var buckets = []
   for (var i = 0; i < group.results.length; i++) {
     var r = group.results[i]
-    if (!(r.label in byLabel)) {
-      byLabel[r.label] = []
-      order.push(r.label)
+    var idx = labels.indexOf(r.label)
+    if (idx === -1) {
+      labels.push(r.label)
+      buckets.push([])
+      idx = buckets.length - 1
     }
-    byLabel[r.label].push(r.display)
+    buckets[idx].push(r.display)
   }
   var parts = []
-  for (var j = 0; j < order.length; j++)
-    parts.push(order[j] + ": " + byLabel[order[j]].join(", "))
+  for (var j = 0; j < labels.length; j++)
+    parts.push(labels[j] + ": " + buckets[j].join(", "))
   return parts.join("   ")
 }
