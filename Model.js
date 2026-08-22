@@ -29,24 +29,16 @@ function rollSides(sides) {
 }
 
 // Roll one die → { label, display, value }. `value` is the numeric
-// contribution (null when a side is non-numeric text).
+// contribution; fate and explicit-sides dice are non-additive (value null),
+// so they only show the face rolled.
 function rollDie(die) {
   if (die.kind === "fate") {
     var face = rollFate()
-    return {
-      label: die.label,
-      display: face === "" ? "0" : face,
-      value: face === "+" ? 1 : (face === "-" ? -1 : 0)
-    }
+    return { label: die.label, display: face === "" ? "0" : face, value: null }
   }
   if (die.kind === "sides") {
     var s = rollSides(die.sides)
-    var n = Number(s)
-    return {
-      label: die.label,
-      display: String(s),
-      value: (s !== "" && isFinite(n)) ? n : null
-    }
+    return { label: die.label, display: String(s), value: null }
   }
   var v = rollNumeric(die.sides)
   return { label: die.label, display: String(v), value: v }

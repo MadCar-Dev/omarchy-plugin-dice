@@ -68,7 +68,7 @@ Panel {
       else total += r.value
     }
     history = [{ results: results, total: allNumeric ? total : null, time: Date.now() }]
-      .concat(history).slice(0, 50)
+      .concat(history).slice(0, 5)
     if (soundEnabled) playSound()
   }
 
@@ -90,6 +90,7 @@ Panel {
   property int newSides: 6
   property string newSidesText: ""
   property string formError: ""
+  property bool addFormOpen: false
 
   function addCustomDie() {
     var name = Model.plainText(newName).replace(/^\s+|\s+$/g, "")
@@ -203,69 +204,84 @@ Panel {
 
         PanelSectionHeader { text: "Custom dice"; foreground: root.fg; fontFamily: root.fontFam }
 
-        Row {
+        Button {
+          width: parent.width
+          leftAlign: true
+          text: "Add custom die"
+          iconText: root.addFormOpen ? "\uF0140" : "\uF0142"
+          foreground: root.fg
+          onClicked: root.addFormOpen = !root.addFormOpen
+        }
+
+        Column {
+          visible: root.addFormOpen
           width: parent.width
           spacing: Style.spacing.md
+
+          Row {
+            width: parent.width
+            spacing: Style.spacing.md
+
+            TextField {
+              id: nameField
+              width: parent.width * 0.42
+              placeholderText: "Name"
+              text: root.newName
+              foreground: root.fg
+              onTextEdited: root.newName = text
+            }
+
+            Dropdown {
+              id: typeDropdown
+              width: parent.width * 0.58 - Style.spacing.md
+              value: root.newType
+              options: [
+                { value: "numeric", label: "Numeric (dN)" },
+                { value: "sides", label: "Explicit sides" }
+              ]
+              foreground: root.fg
+              onChanged: function(v) { root.newType = v }
+            }
+          }
+
+          NumberField {
+            visible: root.newType === "numeric"
+            label: "Sides (1–1000000)"
+            value: root.newSides
+            from: 1
+            to: 1000000
+            stepSize: 1
+            foreground: root.fg
+            onModified: function(v) { root.newSides = v }
+          }
 
           TextField {
-            id: nameField
-            width: parent.width * 0.42
-            placeholderText: "Name"
-            text: root.newName
+            visible: root.newType === "sides"
+            width: parent.width
+            placeholderText: "Sides, comma-separated (e.g. heads, tails)"
+            text: root.newSidesText
             foreground: root.fg
-            onTextEdited: root.newName = text
+            onTextEdited: root.newSidesText = text
           }
 
-          Dropdown {
-            id: typeDropdown
-            width: parent.width * 0.58 - Style.spacing.md
-            value: root.newType
-            options: [
-              { value: "numeric", label: "Numeric (dN)" },
-              { value: "sides", label: "Explicit sides" }
-            ]
-            foreground: root.fg
-            onChanged: function(v) { root.newType = v }
-          }
-        }
+          Row {
+            width: parent.width
+            spacing: Style.spacing.md
 
-        NumberField {
-          visible: root.newType === "numeric"
-          label: "Sides (1–1000000)"
-          value: root.newSides
-          from: 1
-          to: 1000000
-          stepSize: 1
-          foreground: root.fg
-          onModified: function(v) { root.newSides = v }
-        }
+            Button {
+              text: "Add die"
+              foreground: root.fg
+              onClicked: root.addCustomDie()
+            }
 
-        TextField {
-          visible: root.newType === "sides"
-          width: parent.width
-          placeholderText: "Sides, comma-separated (e.g. heads, tails)"
-          text: root.newSidesText
-          foreground: root.fg
-          onTextEdited: root.newSidesText = text
-        }
-
-        Row {
-          width: parent.width
-          spacing: Style.spacing.md
-
-          Button {
-            text: "Add die"
-            foreground: root.fg
-            onClicked: root.addCustomDie()
-          }
-
-          Text {
-            visible: root.formError !== ""
-            text: root.formError
-            color: Color.urgent
-            font.family: root.fontFam
-            font.pixelSize: Style.font.bodySmall
-            anchors.verticalCenter: parent.verticalCenter
+            Text {
+              visible: root.formError !== ""
+              text: root.formError
+              color: Color.urgent
+              font.family: root.fontFam
+              font.pixelSize: Style.font.bodySmall
+              anchors.verticalCenter: parent.verticalCenter
+            }
           }
         }
 
@@ -313,15 +329,6 @@ Panel {
         // ===================== Dice =====================
         PanelSectionHeader { text: "Dice"; foreground: root.fg; fontFamily: root.fontFam }
 
-        Text {
-          visible: root.pending.length > 0
-          text: "Rolling: " + root.pendingLabel
-          textFormat: Text.PlainText
-          color: Color.accent
-          font.family: root.fontFam
-          font.pixelSize: Style.font.bodySmall
-        }
-
         Grid {
           id: diceGrid
           width: parent.width
@@ -339,6 +346,15 @@ Panel {
               onClicked: root.queueDie(modelData)
             }
           }
+        }
+
+        Text {
+          visible: root.pending.length > 0
+          text: "Rolling: " + root.pendingLabel
+          textFormat: Text.PlainText
+          color: Color.accent
+          font.family: root.fontFam
+          font.pixelSize: Style.font.bodySmall
         }
 
         PanelSeparator { foreground: root.fg }

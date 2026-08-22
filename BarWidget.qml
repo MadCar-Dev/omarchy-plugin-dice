@@ -4,12 +4,12 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Bar pill for the dice roller: a "d20" label that opens the roll panel.
+// Bar pill for the dice roller: a d20 icon that opens the roll panel.
 BarWidget {
   id: root
   moduleName: "crueber.rpgdice"
 
-  readonly property string icon: Model.plainText(setting("icon", "d20"))
+  readonly property string icon: Model.plainText(setting("icon", "\uDB84\uDD55"))
 
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
 
