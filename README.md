@@ -33,6 +33,25 @@ omarchy-shell shell rescanPlugins
 omarchy plugin enable crueber.rpgdice center
 ```
 
+## Removal
+
+```sh
+omarchy plugin remove crueber.rpgdice --yes
+```
+
+This disables the widget, deletes the plugin, and rescans the shell. Because the
+plugin is a git checkout, the directory is removed outright (the source stays
+upstream). Omit `--yes` to be prompted for confirmation.
+
+To keep it installed but hide it from the bar instead:
+
+```sh
+omarchy plugin disable crueber.rpgdice
+```
+
+Settings are kept under `~/.local/state/omarchy/rpgdice/state.json`, so
+reinstalling preserves your custom dice.
+
 ## Usage
 
 Click the d20 icon in the bar to open the panel.
