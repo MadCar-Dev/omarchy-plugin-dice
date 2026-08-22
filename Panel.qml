@@ -293,32 +293,40 @@ Panel {
             width: parent.width
             spacing: Style.spacing.md
 
-            Text {
-              text: Model.plainText(modelData.name)
-              textFormat: Text.PlainText
-              color: root.fg
-              font.family: root.fontFam
-              font.pixelSize: Style.font.body
-              font.bold: true
+            Column {
+              width: parent.width - removeBtn.width - parent.spacing
+              spacing: Style.spacing.xxs
               anchors.verticalCenter: parent.verticalCenter
-            }
 
-            Text {
-              text: Model.describeDie(modelData)
-              textFormat: Text.PlainText
-              color: Qt.darker(root.fg, 1.5)
-              font.family: root.fontFam
-              font.pixelSize: Style.font.caption
-              elide: Text.ElideRight
-              anchors.verticalCenter: parent.verticalCenter
-              width: parent.width - Style.space(40)
+              Text {
+                text: Model.plainText(modelData.name)
+                textFormat: Text.PlainText
+                color: root.fg
+                font.family: root.fontFam
+                font.pixelSize: Style.font.body
+                font.bold: true
+                elide: Text.ElideRight
+                width: parent.width
+              }
+
+              Text {
+                text: Model.describeDie(modelData)
+                textFormat: Text.PlainText
+                color: Qt.darker(root.fg, 1.5)
+                font.family: root.fontFam
+                font.pixelSize: Style.font.caption
+                elide: Text.ElideRight
+                width: parent.width
+              }
             }
 
             PanelActionButton {
+              id: removeBtn
               iconText: "×"
               tooltipText: "Remove"
               foreground: root.fg
               hoverColor: Color.urgent
+              anchors.verticalCenter: parent.verticalCenter
               onClicked: root.removeCustomDie(modelData.name)
             }
           }
