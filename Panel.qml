@@ -120,16 +120,27 @@ Panel {
     saveState()
   }
 
-  FileView {
-    id: stateView
-    path: root.stateFile
-    printErrors: false
-    onLoaded: {
-      var s = Model.parseState(text())
-      root.soundEnabled = s.soundEnabled
-      root.volume = s.volume
-      root.customDice = s.customDice
+  function applyState(raw) {
+    var s = Model.parseState(raw)
+    root.soundEnabled = s.soundEnabled
+    root.volume = s.volume
+    root.customDice = s.customDice
+  }
+
+  // stat the file and only cat it when under the byte cap. FileView reads the
+  // whole file into the long-lived shell before parseState can reject it;
+  // bounding the read keeps an oversized or corrupt state.json from forcing
+  // unbounded allocation.
+  Process {
+    id: stateLoader
+    command: ["bash", "-c",
+      'w="$1"; [ -f "$w" ] && [ "$(stat -c%s "$w" 2>/dev/null)" -le ' + Model.MAX_STATE_BYTES + ' ] && cat "$w"',
+      "_", root.stateFile]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyState(String(text || ""))
     }
+    Component.onCompleted: running = true
   }
 
   Timer {

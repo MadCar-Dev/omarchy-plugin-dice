@@ -71,6 +71,14 @@ function assetPath(url) {
 
 var DEFAULT_STATE = { soundEnabled: true, volume: 60, customDice: [] }
 
+// Hard bounds on persisted state. The file is a tiny config blob, so anything
+// beyond these limits is garbage — refusing to grow the in-memory model past
+// them keeps a corrupt or oversized state.json from forcing unbounded
+// allocation in the long-lived shell.
+var MAX_STATE_BYTES = 65536
+var MAX_CUSTOM_DICE = 128
+var MAX_SIDES = 256
+
 function clampVolume(v) {
   var n = Number(v)
   if (!isFinite(n)) return 60
@@ -80,13 +88,16 @@ function clampVolume(v) {
 function sanitizeCustomDice(list) {
   if (!Array.isArray(list)) return []
   var out = []
-  for (var i = 0; i < list.length; i++) {
+  for (var i = 0; i < list.length && out.length < MAX_CUSTOM_DICE; i++) {
     var d = list[i]
     if (!d || typeof d !== "object") continue
     var name = plainText(d.name).replace(/^\s+|\s+$/g, "")
     if (!name) continue
     if (d.kind === "sides") {
-      var sides = Array.isArray(d.sides) ? d.sides.map(function (x) { return plainText(x) }) : []
+      var src = Array.isArray(d.sides) ? d.sides : []
+      var sides = []
+      for (var s = 0; s < src.length && sides.length < MAX_SIDES; s++)
+        sides.push(plainText(src[s]))
       if (sides.length === 0) continue
       out.push({ name: name, kind: "sides", sides: sides })
     } else {
