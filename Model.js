@@ -141,10 +141,20 @@ function pendingLabel(pending) {
   return parts.join(" + ")
 }
 
-// "d20: 14   d6: 3" for a rolled group.
+// "d6: 3, 4, 5   d8: 8" — same-type dice grouped, values comma-separated.
 function groupLabel(group) {
+  var order = []
+  var byLabel = Object.create(null)
+  for (var i = 0; i < group.results.length; i++) {
+    var r = group.results[i]
+    if (!(r.label in byLabel)) {
+      byLabel[r.label] = []
+      order.push(r.label)
+    }
+    byLabel[r.label].push(r.display)
+  }
   var parts = []
-  for (var i = 0; i < group.results.length; i++)
-    parts.push(group.results[i].label + ": " + group.results[i].display)
+  for (var j = 0; j < order.length; j++)
+    parts.push(order[j] + ": " + byLabel[order[j]].join(", "))
   return parts.join("   ")
 }
