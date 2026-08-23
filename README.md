@@ -106,8 +106,9 @@ Where the logic lives:
 - **Debounce** — `Panel.qml`'s `debounceTimer` (1.5s) restarts on each
   `queueDie()` and rolls the accumulated `pending` list on timeout.
 - **Persistence** — state is JSON under
-  `~/.local/state/omarchy/rpgdice/state.json`, read with `FileView` and written
-  via `Util.execDetached`.
+  `~/.local/state/omarchy/rpgdice/state.json`, read with a size-bounded
+  `Process` (symlink- and FIFO-safe) and written atomically via
+  `Util.execDetached`.
 
 Validate before publishing:
 

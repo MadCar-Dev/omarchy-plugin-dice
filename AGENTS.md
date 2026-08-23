@@ -38,16 +38,22 @@ size bound — an oversized or corrupt file forces unbounded allocation.
 
 - `FileView` reads the *entire* file before any code can validate or reject it.
   Do not use it for user-writable files.
-- Read `state.json` with a stat-gated `Process` that only `cat`s files under
-  `MAX_STATE_BYTES` (64 KiB). See `Panel.qml`'s `stateLoader`.
+- Read `state.json` with the bounded `Process` in `Panel.qml`'s `stateLoader`:
+  a single `dd` open (`iflag=nofollow,nonblock`) so a symlink is refused and a
+  FIFO can't hang, a byte cap of `MAX_STATE_BYTES`, and a `timeout` deadline.
+  Never `test`/`stat` the path and then `cat` it — the path can change in
+  between, redirecting or hanging the read.
 - Cap the in-memory model too: `MAX_CUSTOM_DICE` (128) and `MAX_SIDES` (256)
   in `Model.js`. A file under the byte cap can still contain a huge array.
 
 ### Persistence
 
 - State lives at `~/.local/state/omarchy/rpgdice/state.json`.
-- Read: the bounded `Process` above. Write: `Util.execDetached` with
-  `Util.shellQuote` — never interpolate raw strings into a shell command.
+- Read: the bounded `Process` above. Write: `mktemp` a file in the state dir,
+  print the JSON into it, then `mv -f` it over `state.json` — a plain
+  `> state.json` follows a symlink and truncates its target.
+- Use `Util.execDetached` with `Util.shellQuote` — never interpolate raw
+  strings into a shell command.
 
 ### Theme
 

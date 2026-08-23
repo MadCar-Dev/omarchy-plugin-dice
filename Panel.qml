@@ -81,7 +81,9 @@ Panel {
   function saveState() {
     var json = Model.serializeState({ soundEnabled: soundEnabled, volume: volume, customDice: customDice })
     Util.execDetached("mkdir -p " + Util.shellQuote(stateDir)
-      + " && printf '%s' " + Util.shellQuote(json) + " > " + Util.shellQuote(stateFile))
+      + " && t=$(mktemp -p " + Util.shellQuote(stateDir) + " .state.XXXXXX)"
+      + " && printf '%s' " + Util.shellQuote(json) + " > \"$t\""
+      + " && mv -f \"$t\" " + Util.shellQuote(stateFile))
   }
 
   // ---- custom dice form ----
@@ -127,18 +129,26 @@ Panel {
     root.customDice = s.customDice
   }
 
-  // stat the file and only cat it when under the byte cap. FileView reads the
-  // whole file into the long-lived shell before parseState can reject it;
-  // bounding the read keeps an oversized or corrupt state.json from forcing
-  // unbounded allocation.
+  // Open state.json once and read from that descriptor only. `dd` refuses
+  // symlinks (iflag=nofollow), refuses to hang on a FIFO (iflag=nonblock), and
+  // `timeout` is the hard deadline if an open/read ever stalls. The read is
+  // capped at MAX_STATE_BYTES + 1 so an oversized or corrupt state.json can't
+  // force unbounded allocation (FileView would read the whole file first).
+  // Never stat/test the path and then cat it separately — the path can change
+  // in between, redirecting or hanging the read.
   Process {
     id: stateLoader
     command: ["bash", "-c",
-      'w="$1"; [ -f "$w" ] && [ "$(stat -c%s "$w" 2>/dev/null)" -le ' + Model.MAX_STATE_BYTES + ' ] && cat "$w"',
+      'w="$1"; timeout ' + Model.STATE_READ_TIMEOUT_SECS
+      + ' dd if="$w" iflag=nofollow,nonblock bs=' + (Model.MAX_STATE_BYTES + 1)
+      + ' count=1 status=none 2>/dev/null',
       "_", root.stateFile]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.applyState(String(text || ""))
+      onStreamFinished: {
+        var raw = String(text || "")
+        root.applyState(raw.length > Model.MAX_STATE_BYTES ? "" : raw)
+      }
     }
     Component.onCompleted: running = true
   }

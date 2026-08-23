@@ -78,6 +78,8 @@ var DEFAULT_STATE = { soundEnabled: true, volume: 60, customDice: [] }
 var MAX_STATE_BYTES = 65536
 var MAX_CUSTOM_DICE = 128
 var MAX_SIDES = 256
+// dd open/read deadline (seconds) for state.json — bounds a stalled read.
+var STATE_READ_TIMEOUT_SECS = 5
 
 function clampVolume(v) {
   var n = Number(v)
