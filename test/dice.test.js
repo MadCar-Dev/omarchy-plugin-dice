@@ -215,3 +215,64 @@ test("roll: a reroll that can never stop hits the per-die budget", () => {
   assert.equal(r.ok, false)
   assert.equal(r.error, "Reroll/explode limit reached")
 })
+
+test("parse: explode forms", () => {
+  assert.deepEqual(Dice.parse("3d6!").ast.explode, { kind: "!", cmp: null })
+  assert.deepEqual(Dice.parse("3d6!!").ast.explode, { kind: "!!", cmp: null })
+  assert.deepEqual(Dice.parse("3d6!p").ast.explode, { kind: "!p", cmp: null })
+  assert.deepEqual(Dice.parse("d6!>5").ast.explode, { kind: "!", cmp: { op: ">", value: 5 } })
+  assert.deepEqual(Dice.parse("d6!5").ast.explode, { kind: "!", cmp: { op: "=", value: 5 } })
+  assert.deepEqual(Dice.parse("d6!!<=2").ast.explode, { kind: "!!", cmp: { op: "<=", value: 2 } })
+  assert.equal(Dice.parse("3d6!+2").ok, true)   // '+' is not a compare
+  assert.deepEqual(Dice.parse("d6!!!"), { ok: false, error: "Only one explode modifier per term", column: 5 })
+  assert.deepEqual(Dice.parse("d6!r1!"), { ok: false, error: "Only one explode modifier per term", column: 6 })
+  assert.deepEqual(Dice.parse("dF!"), { ok: false, error: "Fate dice cannot explode or reroll", column: 1 })
+})
+
+test("roll: ! adds a die for each max face, recursively", () => {
+  const r = Dice.evaluate("2d6!", scripted([6, 6, 2, 3])).result
+  assert.deepEqual(r.terms[0].trace.map(e => [e.value, e.exploded]), [[6, false], [6, true], [2, true], [3, false]])
+  assert.equal(r.total, 17)
+})
+
+test("roll: ! with a compare target", () => {
+  const r = Dice.evaluate("d6!>4", scripted([5, 6, 1])).result
+  assert.deepEqual(r.terms[0].trace.map(e => e.value), [5, 6, 1])
+  assert.equal(r.total, 12)
+})
+
+test("roll: !! compounds into one entry with faces", () => {
+  const r = Dice.evaluate("2d6!!", scripted([6, 6, 2, 4])).result
+  assert.deepEqual(r.terms[0].trace, [
+    { value: 14, kept: true, rerolled: false, exploded: true, faces: [6, 6, 2] },
+    { value: 4, kept: true, rerolled: false, exploded: false }
+  ])
+  assert.equal(r.total, 18)
+})
+
+test("roll: !p subtracts one from each added die and tests the raw face", () => {
+  const r = Dice.evaluate("d6!p", scripted([6, 6, 3])).result
+  assert.deepEqual(r.terms[0].trace.map(e => e.value), [6, 5, 2])
+  assert.equal(r.total, 13)
+})
+
+test("roll: explosions happen after rerolls and before keep/drop", () => {
+  // d6r1!kh1 : roll 1 → reroll → 6 → explode → 4 ; keep highest one
+  const r = Dice.evaluate("1d6r1!kh1", scripted([1, 6, 4])).result
+  assert.deepEqual(r.terms[0].trace.map(e => [e.value, e.kept, e.rerolled, e.exploded]),
+    [[1, false, true, false], [6, true, false, false], [4, false, false, true]])
+  assert.equal(r.total, 6)
+})
+
+test("roll: an explosion that never stops hits the per-die budget", () => {
+  const r = Dice.evaluate("d1!", seeded(3))
+  assert.equal(r.ok, false)
+  assert.equal(r.error, "Reroll/explode limit reached")
+})
+
+test("roll: a term cannot grow past maxDice", () => {
+  // 1000d2! explodes on half the faces; the trace passes 1000 long before any one die's budget does
+  const r = Dice.evaluate("1000d2!", seeded(5))
+  assert.equal(r.ok, false)
+  assert.equal(r.error, "Too many dice in one term")
+})

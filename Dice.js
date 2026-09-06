@@ -116,6 +116,7 @@ Parser.prototype.modifiers = function (node, start) {
     var c = this.peekLower()
     if (c === "k" || c === "d") this.keepModifier(node, c)
     else if (c === "r") this.rerollModifier(node)
+    else if (c === "!") this.explodeModifier(node)
     else break
   }
   if (node.fate && (node.explode || node.reroll)) this.fail("Fate dice cannot explode or reroll", start)
@@ -160,6 +161,16 @@ Parser.prototype.rerollModifier = function (node) {
   var once = false
   if (this.peekLower() === "o") { this.i++; once = true }
   node.reroll = { once: once, cmp: this.compare(true, once ? "ro" : "r") }
+}
+
+// explode := '!' ['!' | 'p'] [compare]
+Parser.prototype.explodeModifier = function (node) {
+  if (node.explode) this.fail("Only one explode modifier per term")
+  this.i++
+  var kind = "!"
+  if (this.peek() === "!") { this.i++; kind = "!!" }
+  else if (this.peekLower() === "p") { this.i++; kind = "!p" }
+  node.explode = { kind: kind, cmp: this.compare(false, "!") }
 }
 
 function parse(text) {
@@ -266,9 +277,37 @@ function rollDiceTerm(node, rng) {
     return v
   }
 
+  var ex = node.explode
+  var exCmp = ex ? (ex.cmp || { op: "=", value: node.sides }) : null
+
   for (var i = 0; i < node.count; i++) {
     budget = 0
-    trace.push(entry(rollOne()))
+    var v = rollOne()
+    if (!ex) { trace.push(entry(v)); continue }
+
+    if (ex.kind === "!!") {
+      var faces = [v]
+      var sum = v
+      var last = v
+      while (matches(exCmp, last)) {
+        spend()
+        last = rollOne()
+        faces.push(last)
+        sum += last
+      }
+      if (faces.length > 1) trace.push({ value: sum, kept: true, rerolled: false, exploded: true, faces: faces })
+      else trace.push(entry(v))
+      continue
+    }
+
+    trace.push(entry(v))
+    var cur = v
+    while (matches(exCmp, cur)) {
+      spend()
+      var raw = rollOne()
+      trace.push({ value: ex.kind === "!p" ? raw - 1 : raw, kept: true, rerolled: false, exploded: true })
+      cur = raw
+    }
   }
   if (node.keep) applyKeep(trace, node.keep)
   var total = 0
