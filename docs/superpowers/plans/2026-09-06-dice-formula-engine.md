@@ -850,8 +850,8 @@ function rollDiceTerm(node, rng) {
   var budget = 0   // reroll + explode steps for the current starting die
 
   function spend() {
-    if (++budget > LIMITS.maxIterations) throw limitError("Reroll/explode limit reached")
     if (trace.length >= LIMITS.maxDice) throw limitError("Too many dice in one term")
+    if (++budget > LIMITS.maxIterations) throw limitError("Reroll/explode limit reached")
   }
 
   // Roll one die, applying rerolls. Rerolled faces are pushed as dropped
@@ -914,7 +914,7 @@ test("parse: explode forms", () => {
   assert.deepEqual(Dice.parse("d6!5").ast.explode, { kind: "!", cmp: { op: "=", value: 5 } })
   assert.deepEqual(Dice.parse("d6!!<=2").ast.explode, { kind: "!!", cmp: { op: "<=", value: 2 } })
   assert.equal(Dice.parse("3d6!+2").ok, true)   // '+' is not a compare
-  assert.deepEqual(Dice.parse("d6!!!"), { ok: false, error: 'Unexpected "!"', column: 5 })
+  assert.deepEqual(Dice.parse("d6!!!"), { ok: false, error: "Only one explode modifier per term", column: 5 })
   assert.deepEqual(Dice.parse("d6!r1!"), { ok: false, error: "Only one explode modifier per term", column: 6 })
   assert.deepEqual(Dice.parse("dF!"), { ok: false, error: "Fate dice cannot explode or reroll", column: 1 })
 })
@@ -961,8 +961,8 @@ test("roll: an explosion that never stops hits the per-die budget", () => {
 })
 
 test("roll: a term cannot grow past maxDice", () => {
-  // 1000d2!>0 explodes on every face; the trace hits 1000 before the budget does
-  const r = Dice.evaluate("1000d2!>0", seeded(5))
+  // 1000d2! explodes on half the faces; the trace passes 1000 long before any one die's budget does
+  const r = Dice.evaluate("1000d2!", seeded(5))
   assert.equal(r.ok, false)
   assert.equal(r.error, "Too many dice in one term")
 })
@@ -1084,7 +1084,7 @@ test("format: multiple terms are labelled; rounding shown", () => {
   const r = Dice.evaluate("d20+2d6", scripted([17, 3, 5])).result
   assert.equal(Dice.format(r), "d20+2d6 → d20: 17 | 2d6: 3 5 = 25")
   const h = Dice.evaluate("d6/2", scripted([3])).result
-  assert.equal(Dice.format(h), "d6/2 → 3 = 2 (1.5)")
+  assert.equal(Dice.format(h), "d6/2 → d6: 3 = 2 (1.5)")
   const n = Dice.evaluate("2+3").result
   assert.equal(Dice.format(n), "2+3 = 5")
 })
@@ -1904,7 +1904,7 @@ Move the existing Settings block (from `PanelSectionHeader { text: "Settings" ..
           width: parent.width
           leftAlign: true
           text: "Settings"
-          iconText: root.settingsOpen ? "0" : "2"
+          iconText: root.settingsOpen ? "\uF0140" : "\uF0142"
           foreground: root.fg
           onClicked: root.settingsOpen = !root.settingsOpen
         }
