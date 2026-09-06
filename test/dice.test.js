@@ -174,3 +174,44 @@ test("roll: Fate dice accept keep/drop", () => {
   assert.equal(r.total, 2)
   assert.equal(r.terms[0].trace[0].kept, false)
 })
+
+test("parse: reroll forms and compares", () => {
+  assert.deepEqual(Dice.parse("2d6r1").ast.reroll, { once: false, cmp: { op: "=", value: 1 } })
+  assert.deepEqual(Dice.parse("d20ro<3").ast.reroll, { once: true, cmp: { op: "<", value: 3 } })
+  assert.deepEqual(Dice.parse("d6r>=5").ast.reroll.cmp, { op: ">=", value: 5 })
+  assert.deepEqual(Dice.parse("d6r<=2").ast.reroll.cmp, { op: "<=", value: 2 })
+  assert.deepEqual(Dice.parse("d6r=6").ast.reroll.cmp, { op: "=", value: 6 })
+  assert.deepEqual(Dice.parse("d6r"), { ok: false, error: "Expected a number after r", column: 4 })
+  assert.deepEqual(Dice.parse("d6ro"), { ok: false, error: "Expected a number after ro", column: 5 })
+  assert.deepEqual(Dice.parse("d6r1r2"), { ok: false, error: "Only one reroll modifier per term", column: 5 })
+  assert.deepEqual(Dice.parse("dFr1"), { ok: false, error: "Fate dice cannot explode or reroll", column: 1 })
+})
+
+test("roll: r rerolls until the compare fails, ro rerolls once", () => {
+  const r = Dice.evaluate("2d6r1", scripted([1, 1, 4, 2])).result
+  assert.deepEqual(r.terms[0].trace.map(e => [e.value, e.kept, e.rerolled]),
+    [[1, false, true], [1, false, true], [4, true, false], [2, true, false]])
+  assert.equal(r.total, 6)
+  const ro = Dice.evaluate("1d6ro1", scripted([1, 1])).result
+  assert.deepEqual(ro.terms[0].trace.map(e => [e.value, e.kept]), [[1, false], [1, true]])
+  assert.equal(ro.total, 1)
+})
+
+test("roll: reroll compare operators", () => {
+  assert.equal(Dice.evaluate("d20ro<3", scripted([2, 15])).result.total, 15)
+  assert.equal(Dice.evaluate("d20ro<3", scripted([3])).result.total, 3)
+  assert.equal(Dice.evaluate("d6r>4", scripted([5, 6, 2])).result.total, 2)
+})
+
+test("roll: reroll then keep/drop only considers surviving dice", () => {
+  const r = Dice.evaluate("4d6r1dl1", scripted([1, 6, 5, 4, 3])).result
+  const kept = r.terms[0].trace.filter(e => e.kept).map(e => e.value)
+  assert.deepEqual(kept, [6, 5, 4])
+  assert.equal(r.total, 15)
+})
+
+test("roll: a reroll that can never stop hits the per-die budget", () => {
+  const r = Dice.evaluate("d6r>0", seeded(1))
+  assert.equal(r.ok, false)
+  assert.equal(r.error, "Reroll/explode limit reached")
+})

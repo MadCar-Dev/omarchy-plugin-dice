@@ -115,8 +115,10 @@ Parser.prototype.modifiers = function (node, start) {
   for (;;) {
     var c = this.peekLower()
     if (c === "k" || c === "d") this.keepModifier(node, c)
+    else if (c === "r") this.rerollModifier(node)
     else break
   }
+  if (node.fate && (node.explode || node.reroll)) this.fail("Fate dice cannot explode or reroll", start)
 }
 
 // keep := ('kh'|'kl'|'dh'|'dl'|'k'|'d') [integer]; bare k = kh, bare d = dl
@@ -132,6 +134,32 @@ Parser.prototype.keepModifier = function (node, c) {
   if (n === null) n = 1
   if (n < 1) this.fail("Keep/drop count must be at least 1", at)
   node.keep = { mode: mode, count: n }
+}
+
+// compare := ['>'|'<'|'>='|'<='|'='] integer ; a bare integer means '='.
+// required=false returns null when no compare follows.
+Parser.prototype.compare = function (required, what) {
+  var op = "="
+  var two = this.peek(2)
+  var one = this.peek()
+  if (two === ">=" || two === "<=") { op = two; this.i += 2 }
+  else if (one === ">" || one === "<" || one === "=") { op = one; this.i += 1 }
+  else if (!/^\d/.test(one)) {
+    if (required) this.fail("Expected a number after " + what)
+    return null
+  }
+  var n = this.integer()
+  if (n === null) this.fail("Expected a number after " + what)
+  return { op: op, value: n }
+}
+
+// reroll := ('r' | 'ro') compare
+Parser.prototype.rerollModifier = function (node) {
+  if (node.reroll) this.fail("Only one reroll modifier per term")
+  this.i++
+  var once = false
+  if (this.peekLower() === "o") { this.i++; once = true }
+  node.reroll = { once: once, cmp: this.compare(true, once ? "ro" : "r") }
 }
 
 function parse(text) {
@@ -200,9 +228,48 @@ function applyKeep(trace, keep) {
   for (var d = 0; d < drop.length; d++) trace[drop[d]].kept = false
 }
 
+function matches(cmp, value) {
+  switch (cmp.op) {
+    case ">": return value > cmp.value
+    case "<": return value < cmp.value
+    case ">=": return value >= cmp.value
+    case "<=": return value <= cmp.value
+    default: return value === cmp.value
+  }
+}
+
+function limitError(msg) {
+  return { dice: true, error: msg, column: 0 }
+}
+
 function rollDiceTerm(node, rng) {
   var trace = []
-  for (var i = 0; i < node.count; i++) trace.push(entry(rollFace(node, rng)))
+  var budget = 0   // reroll + explode steps for the current starting die
+
+  function spend() {
+    if (trace.length >= LIMITS.maxDice) throw limitError("Too many dice in one term")
+    if (++budget > LIMITS.maxIterations) throw limitError("Reroll/explode limit reached")
+  }
+
+  // Roll one die, applying rerolls. Rerolled faces are pushed as dropped
+  // entries so the trace shows the chain; the final face is returned.
+  function rollOne() {
+    var v = rollFace(node, rng)
+    if (node.reroll) {
+      while (matches(node.reroll.cmp, v)) {
+        spend()
+        trace.push({ value: v, kept: false, rerolled: true, exploded: false })
+        v = rollFace(node, rng)
+        if (node.reroll.once) break
+      }
+    }
+    return v
+  }
+
+  for (var i = 0; i < node.count; i++) {
+    budget = 0
+    trace.push(entry(rollOne()))
+  }
   if (node.keep) applyKeep(trace, node.keep)
   var total = 0
   for (var j = 0; j < trace.length; j++) if (trace[j].kept) total += trace[j].value
