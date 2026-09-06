@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "id": "crueber.rpgdice",
-  "name": "RPG Dice",
-  "version": "1.0.0",
-  "author": "Christopher Rueber",
+  "id": "madcar.dice",
+  "name": "Dice",
+  "version": "2.0.0",
+  "author": "Will McCandless",
   "license": "MIT",
-  "description": "Dice roller for tabletop RPGs: standard polyhedral dice, Fate dice, and user-defined custom dice.",
+  "description": "Formula-driven dice roller for tabletop RPGs: Roll20/Foundry notation (2d20kh1, 4d6dl1, 3d6!), saved macros, Fate and custom dice.",
   "kinds": [
     "bar-widget"
   ],
@@ -13,8 +13,8 @@
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "RPG Dice",
-    "description": "Roll standard, Fate, and custom dice",
+    "displayName": "Dice",
+    "description": "Roll dice formulas, macros, standard, Fate, and custom dice",
     "category": "Utility",
     "allowMultiple": false,
     "defaultSection": "center"

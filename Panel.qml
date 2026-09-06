@@ -10,8 +10,8 @@ import "Model.js" as Model
 // a 1.5s debounce rolls everything queued at once.
 Panel {
   id: root
-  moduleName: "crueber.rpgdice"
-  ipcTarget: "crueber.rpgdice"
+  moduleName: "madcar.dice"
+  ipcTarget: "madcar.dice"
   manageIpc: false
 
   property var anchorItem: null

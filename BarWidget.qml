@@ -7,7 +7,7 @@ import "Model.js" as Model
 // Bar pill for the dice roller: a d20 icon that opens the roll panel.
 BarWidget {
   id: root
-  moduleName: "crueber.rpgdice"
+  moduleName: "madcar.dice"
 
   readonly property string icon: Model.plainText(setting("icon", "\uDB84\uDD55"))
 
@@ -58,7 +58,7 @@ BarWidget {
   }
 
   IpcHandler {
-    target: "crueber.rpgdice"
+    target: "madcar.dice"
 
     function open(): void { root.open() }
     function close(): void { root.close() }
@@ -72,7 +72,7 @@ BarWidget {
     anchors.fill: parent
     bar: root.bar
     text: root.icon
-    tooltipText: "RPG Dice"
+    tooltipText: "Dice"
 
     onPressed: function(b) {
       if (!root.bar) return
