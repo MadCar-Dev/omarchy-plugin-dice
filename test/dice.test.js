@@ -136,7 +136,7 @@ test("parse: keep/drop forms", () => {
   assert.deepEqual(Dice.parse("4d6d").ast.keep, { mode: "dl", count: 1 })    // bare d = dl, count 1
   assert.deepEqual(Dice.parse("3d6KL2").ast.keep, { mode: "kl", count: 2 })
   assert.deepEqual(Dice.parse("3d6dh1").ast.keep, { mode: "dh", count: 1 })
-  assert.deepEqual(Dice.parse("4d6dl1kh1"), { ok: false, error: "Only one keep/drop modifier per term", column: 6 })
+  assert.deepEqual(Dice.parse("4d6dl1kh1"), { ok: false, error: "Only one keep/drop modifier per term", column: 7 })
   assert.deepEqual(Dice.parse("4d6kh0"), { ok: false, error: "Keep/drop count must be at least 1", column: 4 })
 })
 

@@ -121,7 +121,7 @@ Parser.prototype.modifiers = function (node, start) {
 
 // keep := ('kh'|'kl'|'dh'|'dl'|'k'|'d') [integer]; bare k = kh, bare d = dl
 Parser.prototype.keepModifier = function (node, c) {
-  if (node.keep) this.fail("Only one keep/drop modifier per term", this.i - 1)
+  if (node.keep) this.fail("Only one keep/drop modifier per term")
   var at = this.i
   this.i++
   var side = this.peekLower()
