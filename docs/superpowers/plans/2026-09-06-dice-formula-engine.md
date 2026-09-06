@@ -41,7 +41,7 @@
 | `test/rng.js` | create | `scripted(values)` and `seeded(seed)` rng helpers |
 | `test/dice.test.js` | create | engine tests |
 | `test/model.test.js` | create | state tests |
-| `package.json` | create | `{ "name": "omarchy-plugin-dice", "private": true, "scripts": { "test": "node --test test/" } }` |
+| `package.json` | create | `{ "name": "omarchy-plugin-dice", "private": true, "scripts": { "test": "node --test test/*.test.js" } }` |
 
 ---
 
@@ -135,7 +135,7 @@ git commit -m "Rename plugin to madcar.dice and credit the fork"
   "name": "omarchy-plugin-dice",
   "private": true,
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/*.test.js"
   }
 }
 ```
@@ -261,7 +261,7 @@ test("defaultRng stays in 1..sides", () => {
 
 - [ ] **Step 4: Run to verify failure**
 
-Run: `cd /mnt/data/projects/omarchy-plugin-dice && node --test test/`
+Run: `cd /mnt/data/projects/omarchy-plugin-dice && node --test test/*.test.js`
 Expected: FAIL — `Cannot find module '../Dice.js'`.
 
 - [ ] **Step 5: Create `Dice.js` with the arithmetic parser and evaluator**
@@ -438,7 +438,7 @@ if (typeof module !== "undefined" && module.exports) {
 
 - [ ] **Step 6: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all 8 tests PASS.
 
 - [ ] **Step 7: Commit**
@@ -522,7 +522,7 @@ test("roll: seeded rng stays within faces over many dice", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: the new tests FAIL with `Dice not supported yet`.
 
 - [ ] **Step 3: Implement dice parsing and rolling**
@@ -578,7 +578,7 @@ function rollDiceTerm(node, rng) {
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (14 tests).
 
 - [ ] **Step 5: Commit**
@@ -651,7 +651,7 @@ test("roll: Fate dice accept keep/drop", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: new tests FAIL (`keep` is `null`, totals wrong).
 
 - [ ] **Step 3: Implement**
@@ -711,7 +711,7 @@ In `rollDiceTerm`, after the roll loop and before the total loop, insert:
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (20 tests).
 
 - [ ] **Step 5: Commit**
@@ -779,7 +779,7 @@ test("roll: a reroll that can never stop hits the per-die budget", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: new tests FAIL.
 
 - [ ] **Step 3: Implement**
@@ -882,7 +882,7 @@ function rollDiceTerm(node, rng) {
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (25 tests).
 
 - [ ] **Step 5: Commit**
@@ -970,7 +970,7 @@ test("roll: a term cannot grow past maxDice", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: new tests FAIL.
 
 - [ ] **Step 3: Implement**
@@ -1039,7 +1039,7 @@ Roller: replace the `for (var i = 0; i < node.count; i++)` loop in `rollDiceTerm
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (33 tests).
 
 - [ ] **Step 5: Commit**
@@ -1092,7 +1092,7 @@ test("format: multiple terms are labelled; rounding shown", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: FAIL — `Dice.formatTerm is not a function`.
 
 - [ ] **Step 3: Implement**
@@ -1152,7 +1152,7 @@ if (typeof module !== "undefined" && module.exports) {
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (36 tests).
 
 - [ ] **Step 5: Commit**
@@ -1258,7 +1258,7 @@ test("removed helpers are gone", () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: `test/model.test.js` FAILS — `Model.parseState is not a function` (no export yet).
 
 - [ ] **Step 3: Implement in `Model.js`**
@@ -1409,7 +1409,7 @@ if (typeof module !== "undefined" && module.exports) {
 
 - [ ] **Step 4: Run tests**
 
-Run: `node --test test/`
+Run: `node --test test/*.test.js`
 Expected: all PASS (43 tests).
 
 - [ ] **Step 5: Commit**
@@ -2190,7 +2190,7 @@ Repo: `MadCar-Dev/omarchy-plugin-dice`; installed checkout at
 
 - QML hot-reloads on save. **`Dice.js` and `Model.js` do not** — the shell
   caches compiled JS imports. After editing either: `omarchy restart shell`.
-- Before committing: `node --test test/` and `omarchy plugin validate <dir>`.
+- Before committing: `node --test test/*.test.js` and `omarchy plugin validate <dir>`.
 - Check for load errors: `journalctl --user | grep -i madcar.dice`.
 - Pure-JS files export to node only via
   `if (typeof module !== "undefined" && module.exports) module.exports = {...}`
