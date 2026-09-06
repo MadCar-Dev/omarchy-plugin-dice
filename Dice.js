@@ -89,10 +89,29 @@ Parser.prototype.expr = function () {
   }
 }
 
-// Dice terms are added in Task 3; until then any 'd' is a parse error.
+// dice := [count] 'd' (integer | '%' | 'F') modifier*   (cursor is on the 'd')
 Parser.prototype.dice = function (count, start) {
-  this.fail("Dice not supported yet", start)
+  this.i++
+  var node = { type: "dice", count: count, sides: 0, fate: false, keep: null, explode: null, reroll: null, text: "" }
+  var c = this.peekLower()
+  if (c === "%") { this.i++; node.sides = 100 }
+  else if (c === "f") { this.i++; node.fate = true; node.sides = 3 }
+  else {
+    var n = this.integer()
+    if (n === null) this.fail("Expected die size after d")
+    node.sides = n
+  }
+  if (count < 1) this.fail("Roll at least one die", start)
+  if (count > LIMITS.maxDice) this.fail("At most " + LIMITS.maxDice + " dice per term", start)
+  if (!node.fate && node.sides < 1) this.fail("Die size must be at least 1", start)
+  if (node.sides > LIMITS.maxSides) this.fail("Die size at most " + LIMITS.maxSides, start)
+  this.modifiers(node, start)
+  node.text = this.s.slice(start, this.i)
+  return node
 }
+
+// Modifiers are added in Tasks 4-6.
+Parser.prototype.modifiers = function (node, start) {}
 
 function parse(text) {
   var s = String(text === null || text === undefined ? "" : text)
@@ -136,9 +155,21 @@ function evalNode(node, rng, terms) {
   throw { dice: true, error: "Bad formula node", column: 0 }
 }
 
-// Filled in by Task 3.
+function rollFace(node, rng) {
+  var v = rng(node.sides)
+  return node.fate ? v - 2 : v
+}
+
+function entry(value) {
+  return { value: value, kept: true, rerolled: false, exploded: false }
+}
+
 function rollDiceTerm(node, rng) {
-  throw { dice: true, error: "Dice not supported yet", column: 0 }
+  var trace = []
+  for (var i = 0; i < node.count; i++) trace.push(entry(rollFace(node, rng)))
+  var total = 0
+  for (var j = 0; j < trace.length; j++) if (trace[j].kept) total += trace[j].value
+  return { text: node.text, sides: node.fate ? "F" : node.sides, fate: node.fate, trace: trace, total: total }
 }
 
 // roll(ast, rng, text) -> { total, raw, terms, text }. Terms are in source

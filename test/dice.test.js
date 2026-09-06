@@ -71,3 +71,60 @@ test("defaultRng stays in 1..sides", () => {
     assert.ok(v >= 1 && v <= 6 && Number.isInteger(v))
   }
 })
+
+test("parse: dice term shapes", () => {
+  assert.deepEqual(Dice.parse("d6").ast, { type: "dice", count: 1, sides: 6, fate: false, keep: null, explode: null, reroll: null, text: "d6" })
+  assert.equal(Dice.parse("4D6").ast.count, 4)
+  assert.equal(Dice.parse("d%").ast.sides, 100)
+  const f = Dice.parse("4dF").ast
+  assert.equal(f.fate, true)
+  assert.equal(f.sides, 3)
+  assert.equal(Dice.parse("2d6+d4").ast.right.text, "d4")
+})
+
+test("parse: dice term errors", () => {
+  assert.deepEqual(Dice.parse("4d"), { ok: false, error: "Expected die size after d", column: 3 })
+  assert.deepEqual(Dice.parse("0d6"), { ok: false, error: "Roll at least one die", column: 1 })
+  assert.deepEqual(Dice.parse("d0"), { ok: false, error: "Die size must be at least 1", column: 1 })
+  assert.deepEqual(Dice.parse("1001d6"), { ok: false, error: "At most 1000 dice per term", column: 1 })
+  assert.deepEqual(Dice.parse("d1000001"), { ok: false, error: "Die size at most 1000000", column: 1 })
+})
+
+test("roll: NdX trace and total", () => {
+  const rng = scripted([3, 5, 1])
+  const r = Dice.evaluate("3d6", rng).result
+  assert.equal(r.total, 9)
+  assert.equal(r.terms.length, 1)
+  assert.deepEqual(r.terms[0], {
+    text: "3d6", sides: 6, fate: false, total: 9,
+    trace: [
+      { value: 3, kept: true, rerolled: false, exploded: false },
+      { value: 5, kept: true, rerolled: false, exploded: false },
+      { value: 1, kept: true, rerolled: false, exploded: false }
+    ]
+  })
+  assert.deepEqual(rng.calls, [6, 6, 6])
+})
+
+test("roll: d% rolls 1..100 and dF maps 1..3 to -1..1", () => {
+  const pct = Dice.evaluate("d%", scripted([100])).result
+  assert.equal(pct.total, 100)
+  assert.equal(pct.terms[0].sides, 100)
+  const fate = Dice.evaluate("4dF", scripted([1, 2, 3, 3])).result
+  assert.equal(fate.terms[0].sides, "F")
+  assert.equal(fate.terms[0].fate, true)
+  assert.deepEqual(fate.terms[0].trace.map(e => e.value), [-1, 0, 1, 1])
+  assert.equal(fate.total, 1)
+})
+
+test("roll: terms come back in source order with arithmetic applied", () => {
+  const r = Dice.evaluate("d4 + 2*d6 - 1", scripted([4, 3])).result
+  assert.deepEqual(r.terms.map(t => t.text), ["d4", "d6"])
+  assert.equal(r.total, 4 + 6 - 1)
+})
+
+test("roll: seeded rng stays within faces over many dice", () => {
+  const r = Dice.evaluate("200d8", seeded(42)).result
+  assert.equal(r.terms[0].trace.length, 200)
+  for (const e of r.terms[0].trace) assert.ok(e.value >= 1 && e.value <= 8)
+})
