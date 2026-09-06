@@ -1,6 +1,6 @@
 # Dice formula engine — design
 
-**Status:** Approved by Will 2026-09-06 17:36 CT (brainstorm in Ada's session)
+**Status:** Approved by Will 2026-09-06 17:36 CT (brainstorm in Ada's session); amended 2026-09-06 while planning (rng contract, per-die budget, Fate totals, node export)
 **Repo:** `MadCar-Dev/omarchy-plugin-dice`, forked from `crueber/omarchy-plugin-rpgdice`
 **Plugin id:** `madcar.dice` (replaces `crueber.rpgdice` in the bar)
 
@@ -27,7 +27,7 @@ Three source units, one new:
 | File | Role | Depends on |
 |---|---|---|
 | `Dice.js` (**new**) | Pure JS. Tokenizer, recursive-descent parser, evaluator with per-die traces, formatter. No QML imports. | nothing |
-| `Model.js` | Existing dice objects, state (de)serialization, text sanitizing. Gains schema v2 (macros, recent formulas) and the rpgdice import. | `Dice.js` (to validate macro formulas) |
+| `Model.js` | Existing dice objects, state (de)serialization, text sanitizing. Gains schema v2 (macros, recent formulas). Formula validator injected as `parseState(raw, isValid)`. | nothing |
 | `Panel.qml` | Popup UI: formula box, macro grid, dice grid, results, settings. | `Dice.js`, `Model.js`, `qs.Ui`, `qs.Commons` |
 | `BarWidget.qml` | Bar pill, IPC. Unchanged except ids. | `Model.js` |
 
@@ -46,8 +46,9 @@ Dice.format(result)         -> plain-text summary, e.g. "4d6dl1 → 6 5 4 [3] = 
 Dice.LIMITS                 -> { maxDice, maxSides, maxIterations, maxLength, maxDepth }
 ```
 
-`rng` is a function returning a float in `[0, 1)`. Production passes
-`Math.random`; tests pass a seeded generator so every case is deterministic.
+`rng(sides)` returns an integer in `1..sides`. Production passes
+`Dice.defaultRng`; tests pass a scripted or seeded generator so every case is
+exact.
 
 ### Grammar
 
@@ -101,7 +102,7 @@ present only for compounded dice (the sequence that summed). Term result:
 | `maxLength` | 200 chars | bounds tokenizer work |
 | `maxDice` | 1000 per term, after explosions | bounds trace memory |
 | `maxSides` | 1,000,000 | matches existing custom-die cap |
-| `maxIterations` | 100 reroll/explode passes per term | `d1!` and `d6r>0` terminate |
+| `maxIterations` | 100 reroll/explode steps per starting die | `d1!` and `d6r>0` terminate; `100d6r1` still works |
 | `maxDepth` | 16 nested parentheses | bounds recursion |
 
 Hitting a limit is a **result error**, not an exception: `evaluate` returns
@@ -118,8 +119,9 @@ Hitting a limit is a **result error**, not an exception: `evaluate` returns
   `Text`: kept dice in `root.fg`; dropped and rerolled dice in
   `Qt.darker(root.fg, 1.8)` with `font.strikeout: true`; exploded dice suffixed
   with `!` in `Color.accent`; compound dice show `6+6+2`.
-- Fate and explicit-sides dice keep the current faces-only display and
-  contribute no total (`total: null`), exactly as today.
+- Fate dice show faces (`- 0 +`) and total numerically (the dF button rolls
+  `4dF`). Explicit-sides custom dice keep the faces-only display and no total
+  (`total: null`), exactly as today.
 - Parse errors show inline under the formula box in `Color.urgent` with the
   caret column: `Unexpected "x" at 5`.
 
@@ -190,10 +192,10 @@ hardcoded values. User text through `Model.plainText` with
 ## Testing
 
 - `test/dice.test.js` with node's built-in runner (`node --test`), no deps.
-  `Dice.js` is loaded via a tiny shim since QML `.js` files have no
-  `module.exports` — the shim `eval`s the file and picks up the functions
-  (documented in AGENTS.md).
-- Seeded RNG (mulberry32) so cases are exact. Coverage, at minimum:
+  `Dice.js` and `Model.js` end with a guarded
+  `if (typeof module !== "undefined" && module.exports) module.exports = {...}`
+  that QML ignores (documented in AGENTS.md).
+- Scripted rng (exact faces) plus seeded mulberry32 for volume tests. Coverage, at minimum:
   - parse: every grammar production; case-insensitivity; whitespace; errors
     with correct column for `4d`, `d6k`, `2d20kh1kh1` (a second keep is a
     parse error), `dF!`, unbalanced parens, over-length input.
