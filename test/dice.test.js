@@ -276,3 +276,29 @@ test("roll: a term cannot grow past maxDice", () => {
   assert.equal(r.ok, false)
   assert.equal(r.error, "Too many dice in one term")
 })
+
+test("format: single term, dropped in brackets", () => {
+  const r = Dice.evaluate("4d6dl1", scripted([6, 5, 4, 3])).result
+  assert.equal(Dice.formatTerm(r.terms[0]), "6 5 4 [3]")
+  assert.equal(Dice.format(r), "4d6dl1 → 6 5 4 [3] = 15")
+})
+
+test("format: exploded, compound, rerolled, fate", () => {
+  const ex = Dice.evaluate("d6!", scripted([6, 2])).result
+  assert.equal(Dice.formatTerm(ex.terms[0]), "6 2!")
+  const cp = Dice.evaluate("d6!!", scripted([6, 2])).result
+  assert.equal(Dice.formatTerm(cp.terms[0]), "6+2!")
+  const rr = Dice.evaluate("d6r1", scripted([1, 4])).result
+  assert.equal(Dice.formatTerm(rr.terms[0]), "[1] 4")
+  const f = Dice.evaluate("4dF", scripted([1, 2, 3, 3])).result
+  assert.equal(Dice.formatTerm(f.terms[0]), "- 0 + +")
+})
+
+test("format: multiple terms are labelled; rounding shown", () => {
+  const r = Dice.evaluate("d20+2d6", scripted([17, 3, 5])).result
+  assert.equal(Dice.format(r), "d20+2d6 → d20: 17 | 2d6: 3 5 = 25")
+  const h = Dice.evaluate("d6/2", scripted([3])).result
+  assert.equal(Dice.format(h), "d6/2 → d6: 3 = 2 (1.5)")
+  const n = Dice.evaluate("2+3").result
+  assert.equal(Dice.format(n), "2+3 = 5")
+})

@@ -334,8 +334,49 @@ function evaluate(text, rng) {
   }
 }
 
+// ---- formatter ----------------------------------------------------------
+
+function fateFace(v) {
+  return v < 0 ? "-" : (v > 0 ? "+" : "0")
+}
+
+// "6 5 4 [3]" — dropped/rerolled bracketed, exploded suffixed with '!'
+function formatTerm(term) {
+  var parts = []
+  for (var i = 0; i < term.trace.length; i++) {
+    var e = term.trace[i]
+    var s
+    if (e.faces) s = e.faces.join("+")
+    else if (term.fate) s = fateFace(e.value)
+    else s = String(e.value)
+    if (e.exploded) s += "!"
+    if (!e.kept) s = "[" + s + "]"
+    parts.push(s)
+  }
+  return parts.join(" ")
+}
+
+// "4d6dl1 → 6 5 4 [3] = 15" | "d20+2d6 → d20: 17 | 2d6: 3 5 = 25" | "2+3 = 5"
+function format(result) {
+  var out = result.text
+  if (result.terms.length === 1 && result.terms[0].text === result.text)
+    out += " → " + formatTerm(result.terms[0])
+  else if (result.terms.length > 0) {
+    var labelled = []
+    for (var i = 0; i < result.terms.length; i++)
+      labelled.push(result.terms[i].text + ": " + formatTerm(result.terms[i]))
+    out += " → " + labelled.join(" | ")
+  }
+  out += " = " + result.total
+  if (result.raw !== result.total) out += " (" + result.raw + ")"
+  return out
+}
+
 // ---- node export (ignored by QML) ----------------------------------------
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { LIMITS: LIMITS, defaultRng: defaultRng, parse: parse, roll: roll, evaluate: evaluate }
+  module.exports = {
+    LIMITS: LIMITS, defaultRng: defaultRng, parse: parse, roll: roll, evaluate: evaluate,
+    fateFace: fateFace, formatTerm: formatTerm, format: format
+  }
 }
