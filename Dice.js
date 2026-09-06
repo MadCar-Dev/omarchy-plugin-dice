@@ -110,8 +110,29 @@ Parser.prototype.dice = function (count, start) {
   return node
 }
 
-// Modifiers are added in Tasks 4-6.
-Parser.prototype.modifiers = function (node, start) {}
+// modifier := keep | explode | reroll  (explode/reroll parsing lands in Tasks 5-6)
+Parser.prototype.modifiers = function (node, start) {
+  for (;;) {
+    var c = this.peekLower()
+    if (c === "k" || c === "d") this.keepModifier(node, c)
+    else break
+  }
+}
+
+// keep := ('kh'|'kl'|'dh'|'dl'|'k'|'d') [integer]; bare k = kh, bare d = dl
+Parser.prototype.keepModifier = function (node, c) {
+  if (node.keep) this.fail("Only one keep/drop modifier per term", this.i - 1)
+  var at = this.i
+  this.i++
+  var side = this.peekLower()
+  var mode
+  if (side === "h" || side === "l") { this.i++; mode = c + side }
+  else mode = c === "k" ? "kh" : "dl"
+  var n = this.integer()
+  if (n === null) n = 1
+  if (n < 1) this.fail("Keep/drop count must be at least 1", at)
+  node.keep = { mode: mode, count: n }
+}
 
 function parse(text) {
   var s = String(text === null || text === undefined ? "" : text)
@@ -164,9 +185,25 @@ function entry(value) {
   return { value: value, kept: true, rerolled: false, exploded: false }
 }
 
+// Mark dropped dice among the still-kept entries. Sort indexes by value so
+// ties resolve in roll order and only `count` dice change state.
+function applyKeep(trace, keep) {
+  var idx = []
+  for (var i = 0; i < trace.length; i++) if (trace[i].kept) idx.push(i)
+  idx.sort(function (a, b) { return trace[a].value - trace[b].value || a - b })
+  var n = Math.min(keep.count, idx.length)
+  var drop
+  if (keep.mode === "kh") drop = idx.slice(0, idx.length - n)
+  else if (keep.mode === "kl") drop = idx.slice(n)
+  else if (keep.mode === "dh") drop = idx.slice(idx.length - n)
+  else drop = idx.slice(0, n)
+  for (var d = 0; d < drop.length; d++) trace[drop[d]].kept = false
+}
+
 function rollDiceTerm(node, rng) {
   var trace = []
   for (var i = 0; i < node.count; i++) trace.push(entry(rollFace(node, rng)))
+  if (node.keep) applyKeep(trace, node.keep)
   var total = 0
   for (var j = 0; j < trace.length; j++) if (trace[j].kept) total += trace[j].value
   return { text: node.text, sides: node.fate ? "F" : node.sides, fate: node.fate, trace: trace, total: total }

@@ -128,3 +128,49 @@ test("roll: seeded rng stays within faces over many dice", () => {
   assert.equal(r.terms[0].trace.length, 200)
   for (const e of r.terms[0].trace) assert.ok(e.value >= 1 && e.value <= 8)
 })
+
+test("parse: keep/drop forms", () => {
+  assert.deepEqual(Dice.parse("2d20kh1").ast.keep, { mode: "kh", count: 1 })
+  assert.deepEqual(Dice.parse("4d6dl1").ast.keep, { mode: "dl", count: 1 })
+  assert.deepEqual(Dice.parse("4d6k3").ast.keep, { mode: "kh", count: 3 })   // bare k = kh
+  assert.deepEqual(Dice.parse("4d6d").ast.keep, { mode: "dl", count: 1 })    // bare d = dl, count 1
+  assert.deepEqual(Dice.parse("3d6KL2").ast.keep, { mode: "kl", count: 2 })
+  assert.deepEqual(Dice.parse("3d6dh1").ast.keep, { mode: "dh", count: 1 })
+  assert.deepEqual(Dice.parse("4d6dl1kh1"), { ok: false, error: "Only one keep/drop modifier per term", column: 6 })
+  assert.deepEqual(Dice.parse("4d6kh0"), { ok: false, error: "Keep/drop count must be at least 1", column: 4 })
+})
+
+test("roll: 4d6dl1 drops exactly the lowest and totals the rest", () => {
+  const r = Dice.evaluate("4d6dl1", scripted([6, 5, 4, 3])).result
+  assert.deepEqual(r.terms[0].trace.map(e => [e.value, e.kept]), [[6, true], [5, true], [4, true], [3, false]])
+  assert.equal(r.total, 15)
+})
+
+test("roll: keep highest / lowest, drop highest", () => {
+  const adv = Dice.evaluate("2d20kh1", scripted([7, 18])).result
+  assert.deepEqual(adv.terms[0].trace.map(e => e.kept), [false, true])
+  assert.equal(adv.total, 18)
+  const dis = Dice.evaluate("2d20kl1", scripted([7, 18])).result
+  assert.deepEqual(dis.terms[0].trace.map(e => e.kept), [true, false])
+  assert.equal(dis.total, 7)
+  const dh = Dice.evaluate("3d6dh1", scripted([2, 6, 4])).result
+  assert.deepEqual(dh.terms[0].trace.map(e => e.kept), [true, false, true])
+  assert.equal(dh.total, 6)
+})
+
+test("roll: keep count larger than dice keeps all; drop larger than dice drops all", () => {
+  assert.equal(Dice.evaluate("2d6kh5", scripted([2, 3])).result.total, 5)
+  assert.equal(Dice.evaluate("2d6dl5", scripted([2, 3])).result.total, 0)
+})
+
+test("roll: ties drop only as many as asked", () => {
+  const r = Dice.evaluate("3d6dl1", scripted([3, 3, 3])).result
+  assert.equal(r.terms[0].trace.filter(e => !e.kept).length, 1)
+  assert.equal(r.total, 6)
+})
+
+test("roll: Fate dice accept keep/drop", () => {
+  const r = Dice.evaluate("4dFkh3", scripted([1, 3, 3, 2])).result
+  assert.equal(r.total, 2)
+  assert.equal(r.terms[0].trace[0].kept, false)
+})
