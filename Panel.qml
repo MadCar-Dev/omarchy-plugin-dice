@@ -335,7 +335,8 @@ Panel {
               required property var modelData
               width: (macroGrid.width - macroGrid.spacing * (macroGrid.columns - 1)) / macroGrid.columns
               text: Model.plainText(modelData.name)
-              tooltipText: Model.plainText(modelData.formula)
+              // Not Model.plainText on the formula — see rollFormula in Panel.qml.
+              tooltipText: String(modelData.formula)
               foreground: root.fg
               onClicked: root.rollFormula(modelData.formula, "macro:" + modelData.name)
             }
@@ -584,7 +585,8 @@ Panel {
                 }
 
                 Text {
-                  text: Model.plainText(modelData.formula)
+                  // Not Model.plainText on the formula — see rollFormula in Panel.qml.
+                  text: String(modelData.formula)
                   textFormat: Text.PlainText
                   color: Qt.darker(root.fg, 1.5)
                   font.family: root.fontFam
