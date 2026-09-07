@@ -1,69 +1,70 @@
-# RPG Dice
+# Dice
 
 An [Omarchy](https://omarchy.org/) shell plugin that rolls tabletop RPG dice
-from the status bar — standard polyhedral dice, Fate dice, and your own custom
-dice, with an optional roll sound.
+from the status bar using Roll20 / FoundryVTT notation — `2d20kh1`, `4d6dl1`,
+`3d6!` — with saved macros, standard and Fate dice, custom dice, and an
+optional roll sound.
 
-![RPG Dice panel](preview.png)
+Forked from Christopher Rueber's
+[omarchy-plugin-rpgdice](https://github.com/crueber/omarchy-plugin-rpgdice)
+(MIT). The formula engine, macros, and per-die result traces are new; the
+hardened state handling and theme integration are his.
+
+![Dice panel](preview.png)
 
 ## Features
 
-- **Standard dice** — d4, d6, d8, d10, d12, d20, d% (d100).
-- **Fate dice (dF)** — six faces: two `-`, two blank, two `+`.
-- **Custom dice** — numeric (1–1,000,000 sides) or explicit sides (any labels,
-  e.g. `heads, tails` or `1, 2, sword, shield`).
-- **Three-section panel** — Settings, Dice, Results.
-- **Debounced rolling** — click any number of dice, then 1.5s after your last
-  click everything rolls together and groups by type (`d6: 2, 5, 3   d8: 8`).
+- **Formula box** — type any expression and press Enter. Up/Down recall recent
+  formulas.
+- **Macros** — save named formulas (Advantage `2d20kh1`, Stats `4d6dl1`) as
+  one-click buttons.
+- **Per-die results** — every die is shown; dropped and rerolled dice are
+  dimmed and struck through, exploded dice are marked `!`.
+- **Standard dice** — d4 … d20, d% (d100), all rolling on click.
+- **Fate dice (dF)** — one click rolls `4dF`.
+- **Custom dice** — numeric (1–1,000,000 sides) or explicit faces
+  (`heads, tails`).
 - **Sound** — toggleable roll sound with adjustable volume.
-- **Persistent state** — sound, volume, and custom dice survive restarts.
+- **Persistent state** — sound, volume, macros, custom dice and recent formulas
+  survive restarts.
+
+## Notation
+
+| Write | Meaning | Example |
+|---|---|---|
+| `NdX` | roll N dice with X sides | `3d6` |
+| `d%` / `dF` | percentile die / Fate die (−, 0, +) | `d%`, `4dF` |
+| `+ - * /` `( )` | arithmetic; division rounds to nearest | `(2d6+3)*2` |
+| `kh N` / `kl N` | keep N highest / lowest | `2d20kh1` |
+| `dh N` / `dl N` | drop N highest / lowest | `4d6dl1` |
+| `k N` / `d N` | shorthand for `kh` / `dl` | `4d6k3` |
+| `!` | explode: max face rolls another die | `3d6!` |
+| `!!` | compound: exploded dice add into one | `3d6!!` |
+| `!p` | penetrating: each extra die −1 | `3d6!p` |
+| `r` / `ro` | reroll while / reroll once | `2d6r1`, `d20ro<3` |
+| `> < >= <= =` | targets for `!` and `r` | `d6!>4`, `d10r<=2` |
+
+Modifiers apply in Roll20 order: reroll, then explode, then keep/drop. Limits:
+200 characters, 1000 dice per term, 16 nested parentheses, 100 rerolls or
+explosions per starting die.
 
 ## Installation
 
 ```sh
-omarchy plugin add ssh://git@git.packden.us:2288/crueber/omarchy-plugin-rpgdice.git --enable
+omarchy plugin add https://github.com/MadCar-Dev/omarchy-plugin-dice.git --enable
 ```
 
-Or clone manually:
-
-```sh
-git clone ssh://git@git.packden.us:2288/crueber/omarchy-plugin-rpgdice.git \
-  ~/.config/omarchy/plugins/crueber.rpgdice
-omarchy-shell shell rescanPlugins
-omarchy plugin enable crueber.rpgdice center
-```
+If you had `crueber.rpgdice` installed, its sound, volume, and custom dice are
+imported on first launch. Disable the old widget with
+`omarchy plugin disable crueber.rpgdice`.
 
 ## Removal
 
 ```sh
-omarchy plugin remove crueber.rpgdice --yes
+omarchy plugin remove madcar.dice --yes
 ```
 
-This disables the widget, deletes the plugin, and rescans the shell. Because the
-plugin is a git checkout, the directory is removed outright (the source stays
-upstream). Omit `--yes` to be prompted for confirmation.
-
-To keep it installed but hide it from the bar instead:
-
-```sh
-omarchy plugin disable crueber.rpgdice
-```
-
-Settings are kept under `~/.local/state/omarchy/rpgdice/state.json`, so
-reinstalling preserves your custom dice.
-
-## Usage
-
-Click the d20 icon in the bar to open the panel.
-
-- **Roll** — click one or more dice buttons. The panel waits 1.5s after your
-  last click, then rolls everything together. Results group identical dice:
-  `d6: 3, 4, 5`, joined per type for mixed rolls.
-- **Custom dice** — expand **Add custom die** in Settings. Pick *Numeric* and
-  enter a side count (1–1,000,000), or *Explicit sides* and enter
-  comma-separated labels, then **Add die**. Custom dice appear as roll buttons
-  in the Dice section.
-- **Sound** — toggle it and adjust volume in Settings.
+State lives in `~/.local/state/omarchy/dice/state.json` and survives removal.
 
 ## Configuration
 
@@ -71,50 +72,29 @@ The bar icon is overridable via the widget's entry in
 `~/.config/omarchy/shell.json` (the default is the d20 glyph, U+F1155):
 
 ```json
-{ "id": "crueber.rpgdice", "icon": "d20" }
+{ "id": "madcar.dice", "icon": "d20" }
 ```
 
 ## Development
 
-The shell hot-reloads on save, so changes under
-`~/.config/omarchy/plugins/crueber.rpgdice/` apply automatically. If a change
-fails to land, force a reload:
+QML hot-reloads on save under `~/.config/omarchy/plugins/madcar.dice/`.
+`Dice.js` and `Model.js` do **not** — run `omarchy restart shell` after editing
+them. Tests need node ≥ 20:
 
 ```sh
-omarchy-shell shell rescanPlugins
-omarchy restart shell
+node --test test/*.test.js
+omarchy plugin validate ~/.config/omarchy/plugins/madcar.dice
 ```
-
-Layout:
 
 | File | Purpose |
 |------|---------|
-| `manifest.json` | Plugin manifest (id, kinds, entry points, widget metadata) |
-| `BarWidget.qml` | Bar pill (d20 icon), panel lifecycle, and IPC |
-| `Panel.qml` | Popup panel: Settings/Dice/Results sections, roll debounce, sound, persistence |
-| `Model.js` | Pure dice logic and state (de)serialization — no QML imports |
+| `manifest.json` | Plugin manifest |
+| `BarWidget.qml` | Bar pill (d20 icon), panel lifecycle, IPC |
+| `Panel.qml` | Popup panel: formula, macros, dice, results, settings, persistence |
+| `Dice.js` | Formula parser, roller, formatter — pure JS, tested under node |
+| `Model.js` | Dice objects, text sanitizing, state schema v2 |
+| `test/` | node tests for `Dice.js` and `Model.js` |
 | `assets/dice-roll.wav` | Bundled roll sound |
-
-Where the logic lives:
-
-- **Dice model** — `STANDARD_DICE` and `FATE_DIE` in `Model.js`. Add a new
-  built-in die by appending to `STANDARD_DICE`; the Dice grid picks it up
-  automatically.
-- **Rolling** — `Model.rollDie(die)` returns `{ label, display, value }`.
-  Fate and explicit-sides dice are non-additive (`value: null`); only numeric
-  dice contribute to the group total in `Panel.qml:rollAll()`.
-- **Debounce** — `Panel.qml`'s `debounceTimer` (1.5s) restarts on each
-  `queueDie()` and rolls the accumulated `pending` list on timeout.
-- **Persistence** — state is JSON under
-  `~/.local/state/omarchy/rpgdice/state.json`, read with a size-bounded
-  `Process` (symlink- and FIFO-safe) and written atomically via
-  `Util.execDetached`.
-
-Validate before publishing:
-
-```sh
-omarchy plugin validate ~/.config/omarchy/plugins/crueber.rpgdice
-```
 
 ## License
 
