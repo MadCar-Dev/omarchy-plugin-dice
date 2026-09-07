@@ -265,13 +265,15 @@ Panel {
     bar: root.bar
     open: root.opened
     centerOnBar: true
-    focusTarget: keyCatcher
+    focusTarget: formulaField
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: formulaField.activeFocus || nameField.activeFocus || macroNameField.activeFocus
+        || macroFormulaField.activeFocus || sidesField.activeFocus
       onCloseRequested: root.close()
 
       Column {
@@ -513,21 +515,25 @@ Panel {
             spacing: Style.spacing.md
 
             TextField {
+              id: macroNameField
               width: parent.width * 0.38
               placeholderText: "Name"
               text: root.newMacroName
               foreground: root.fg
               onTextEdited: root.newMacroName = text
               onAccepted: root.addMacro()
+              Keys.onEscapePressed: root.close()
             }
 
             TextField {
+              id: macroFormulaField
               width: parent.width * 0.62 - Style.spacing.md
               placeholderText: "Formula, e.g. 2d20kh1"
               text: root.newMacroFormula
               foreground: root.fg
               onTextEdited: root.newMacroFormula = text
               onAccepted: root.addMacro()
+              Keys.onEscapePressed: root.close()
             }
           }
 
@@ -628,6 +634,7 @@ Panel {
                 text: root.newName
                 foreground: root.fg
                 onTextEdited: root.newName = text
+                Keys.onEscapePressed: root.close()
               }
 
               Dropdown {
@@ -655,12 +662,14 @@ Panel {
             }
 
             TextField {
+              id: sidesField
               visible: root.newType === "sides"
               width: parent.width
               placeholderText: "Sides, comma-separated (e.g. heads, tails)"
               text: root.newSidesText
               foreground: root.fg
               onTextEdited: root.newSidesText = text
+              Keys.onEscapePressed: root.close()
             }
 
             Row {
