@@ -81,7 +81,10 @@ Panel {
 
   // Evaluate a formula and record it. source: "formula" | "macro:<name>" | "die:<label>"
   function rollFormula(text, source) {
-    var t = Model.plainText(text).replace(/^\s+|\s+$/g, "")
+    // Not Model.plainText: it strips '<'/'>', which are dice notation
+    // (reroll/explode compares). Dice.parse (a whitelist grammar) validates
+    // the formula instead, and results render with textFormat: Text.PlainText.
+    var t = String(text === null || text === undefined ? "" : text).replace(/^\s+|\s+$/g, "")
     var r = Dice.evaluate(t, Dice.defaultRng)
     if (!r.ok) {
       formulaError = r.error + (r.column > 0 ? " at " + r.column : "")
@@ -157,7 +160,8 @@ Panel {
 
   function addMacro() {
     var name = Model.plainText(newMacroName).replace(/^\s+|\s+$/g, "")
-    var formula = Model.plainText(newMacroFormula).replace(/^\s+|\s+$/g, "")
+    // Not Model.plainText on the formula — see rollFormula.
+    var formula = String(newMacroFormula === null || newMacroFormula === undefined ? "" : newMacroFormula).replace(/^\s+|\s+$/g, "")
     if (name === "") { macroError = "Enter a name"; return }
     if (name.length > Model.MAX_MACRO_NAME) { macroError = "Name is limited to " + Model.MAX_MACRO_NAME + " characters"; return }
     for (var i = 0; i < macros.length; i++)

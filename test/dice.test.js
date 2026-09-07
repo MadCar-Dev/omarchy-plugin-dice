@@ -302,3 +302,22 @@ test("format: multiple terms are labelled; rounding shown", () => {
   const n = Dice.evaluate("2+3").result
   assert.equal(Dice.format(n), "2+3 = 5")
 })
+
+// Regression for the Panel.qml formula path: the panel used to run every
+// formula through Model.plainText before Dice.parse. plainText strips
+// '<'/'>', silently turning "2d6r<2" into "2d6r2" with no error. These
+// compare operators must parse intact — pins the grammar the panel relies on.
+test("parse: comparison operators survive intact (panel must not run formulas through Model.plainText)", () => {
+  const cases = [
+    { formula: "2d6r<2", pick: (ast) => ast.reroll.cmp.op, op: "<" },
+    { formula: "d6!>4", pick: (ast) => ast.explode.cmp.op, op: ">" },
+    { formula: "d6r>=5", pick: (ast) => ast.reroll.cmp.op, op: ">=" },
+    { formula: "d10r<=2", pick: (ast) => ast.reroll.cmp.op, op: "<=" },
+    { formula: "d20ro<3", pick: (ast) => ast.reroll.cmp.op, op: "<" }
+  ]
+  for (const c of cases) {
+    const p = Dice.parse(c.formula)
+    assert.equal(p.ok, true, c.formula)
+    assert.equal(c.pick(p.ast), c.op, c.formula)
+  }
+})

@@ -66,7 +66,11 @@ hardcode colors or sizes; the active theme drives them.
 
 Custom die names and sides are user input rendered by `Text`. Run them through
 `Model.plainText` (strips `<>&`) and set `textFormat: Text.PlainText` to
-prevent rich-text injection into the long-lived shell.
+prevent rich-text injection into the long-lived shell. Formulas are the
+exception: they are validated by `Dice.parse` (a whitelist grammar) and
+rendered with `textFormat: Text.PlainText`, never passed through
+`Model.plainText`, which would strip the `<`/`>` comparison operators dice
+notation depends on (`2d6r<2`).
 
 ## Dice semantics (`Dice.js`)
 
