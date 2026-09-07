@@ -149,6 +149,37 @@ Panel {
   property string formError: ""
   property bool addFormOpen: false
 
+  // ---- macros form ----
+  property string newMacroName: ""
+  property string newMacroFormula: ""
+  property string macroError: ""
+  property bool settingsOpen: false
+
+  function addMacro() {
+    var name = Model.plainText(newMacroName).replace(/^\s+|\s+$/g, "")
+    var formula = Model.plainText(newMacroFormula).replace(/^\s+|\s+$/g, "")
+    if (name === "") { macroError = "Enter a name"; return }
+    if (name.length > Model.MAX_MACRO_NAME) { macroError = "Name is limited to " + Model.MAX_MACRO_NAME + " characters"; return }
+    for (var i = 0; i < macros.length; i++)
+      if (macros[i].name === name) { macroError = "Name already used"; return }
+    if (macros.length >= Model.MAX_MACROS) { macroError = "At most " + Model.MAX_MACROS + " macros"; return }
+    var p = Dice.parse(formula)
+    if (!p.ok) { macroError = p.error + (p.column > 0 ? " at " + p.column : ""); return }
+    macros = macros.concat([{ name: name, formula: formula }])
+    macroError = ""
+    newMacroName = ""
+    newMacroFormula = ""
+    saveState()
+  }
+
+  function removeMacro(name) {
+    var out = []
+    for (var i = 0; i < macros.length; i++)
+      if (macros[i].name !== name) out.push(macros[i])
+    macros = out
+    saveState()
+  }
+
   function addCustomDie() {
     var name = Model.plainText(newName).replace(/^\s+|\s+$/g, "")
     if (name === "") { formError = "Enter a name"; return }
@@ -259,175 +290,37 @@ Panel {
           wrapMode: Text.WordWrap
         }
 
-        // ===================== Settings =====================
-        PanelSectionHeader { text: "Settings"; foreground: root.fg; fontFamily: root.fontFam }
-
-        Toggle {
-          width: parent.width
-          label: "Sound"
-          description: "Play a sound when dice are rolled"
-          checked: root.soundEnabled
-          foreground: root.fg
-          fontFamily: root.fontFam
-          onClicked: { root.soundEnabled = !root.soundEnabled; root.saveState() }
-        }
-
-        Row {
-          width: parent.width
-          spacing: Style.spacing.md
-          opacity: root.soundEnabled ? 1 : 0.4
-
-          Text {
-            text: "Volume"
-            color: Qt.darker(root.fg, 1.4)
-            font.family: root.fontFam
-            font.pixelSize: Style.font.bodySmall
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.space(64)
-          }
-
-          PanelSlider {
-            id: volSlider
-            width: parent.width - Style.space(64) - Style.spacing.md
-            bar: root.bar
-            value: root.volume
-            minimum: 0
-            maximum: 100
-            step: 1
-            integer: true
-            onMoved: function(v) { if (root.soundEnabled) root.volume = v }
-            onReleased: function(v) { if (root.soundEnabled) { root.volume = v; root.saveState() } }
-          }
-        }
-
         PanelSeparator { foreground: root.fg }
 
-        PanelSectionHeader { text: "Custom dice"; foreground: root.fg; fontFamily: root.fontFam }
+        // ===================== Macros =====================
+        PanelSectionHeader { text: "Macros"; foreground: root.fg; fontFamily: root.fontFam }
 
-        Button {
-          width: parent.width
-          leftAlign: true
-          text: "Add custom die"
-          iconText: root.addFormOpen ? "\uF0140" : "\uF0142"
-          foreground: root.fg
-          onClicked: root.addFormOpen = !root.addFormOpen
+        Text {
+          visible: root.macros.length === 0
+          text: "No macros yet — add one in Settings"
+          color: Qt.darker(root.fg, 1.5)
+          font.family: root.fontFam
+          font.pixelSize: Style.font.bodySmall
+          font.italic: true
         }
 
-        Column {
-          visible: root.addFormOpen
+        Grid {
+          id: macroGrid
+          visible: root.macros.length > 0
           width: parent.width
-          spacing: Style.spacing.md
+          columns: 3
+          spacing: Style.spacing.sm
 
-          Row {
-            width: parent.width
-            spacing: Style.spacing.md
-
-            TextField {
-              id: nameField
-              width: parent.width * 0.42
-              placeholderText: "Name"
-              text: root.newName
-              foreground: root.fg
-              onTextEdited: root.newName = text
-            }
-
-            Dropdown {
-              id: typeDropdown
-              width: parent.width * 0.58 - Style.spacing.md
-              value: root.newType
-              options: [
-                { value: "numeric", label: "Numeric (dN)" },
-                { value: "sides", label: "Explicit sides" }
-              ]
-              foreground: root.fg
-              onChanged: function(v) { root.newType = v }
-            }
-          }
-
-          NumberField {
-            visible: root.newType === "numeric"
-            label: "Sides (1–1000000)"
-            value: root.newSides
-            from: 1
-            to: 1000000
-            stepSize: 1
-            foreground: root.fg
-            onModified: function(v) { root.newSides = v }
-          }
-
-          TextField {
-            visible: root.newType === "sides"
-            width: parent.width
-            placeholderText: "Sides, comma-separated (e.g. heads, tails)"
-            text: root.newSidesText
-            foreground: root.fg
-            onTextEdited: root.newSidesText = text
-          }
-
-          Row {
-            width: parent.width
-            spacing: Style.spacing.md
+          Repeater {
+            model: root.macros
 
             Button {
-              text: "Add die"
+              required property var modelData
+              width: (macroGrid.width - macroGrid.spacing * (macroGrid.columns - 1)) / macroGrid.columns
+              text: Model.plainText(modelData.name)
+              tooltipText: Model.plainText(modelData.formula)
               foreground: root.fg
-              onClicked: root.addCustomDie()
-            }
-
-            Text {
-              visible: root.formError !== ""
-              text: root.formError
-              color: Color.urgent
-              font.family: root.fontFam
-              font.pixelSize: Style.font.bodySmall
-              anchors.verticalCenter: parent.verticalCenter
-            }
-          }
-        }
-
-        Repeater {
-          model: root.customDice
-
-          Row {
-            required property var modelData
-            width: parent.width
-            spacing: Style.spacing.md
-
-            Column {
-              width: parent.width - removeBtn.width - parent.spacing
-              spacing: Style.spacing.xxs
-              anchors.verticalCenter: parent.verticalCenter
-
-              Text {
-                text: Model.plainText(modelData.name)
-                textFormat: Text.PlainText
-                color: root.fg
-                font.family: root.fontFam
-                font.pixelSize: Style.font.body
-                font.bold: true
-                elide: Text.ElideRight
-                width: parent.width
-              }
-
-              Text {
-                text: Model.describeDie(modelData)
-                textFormat: Text.PlainText
-                color: Qt.darker(root.fg, 1.5)
-                font.family: root.fontFam
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
-                width: parent.width
-              }
-            }
-
-            PanelActionButton {
-              id: removeBtn
-              iconText: "×"
-              tooltipText: "Remove"
-              foreground: root.fg
-              hoverColor: Color.urgent
-              anchors.verticalCenter: parent.verticalCenter
-              onClicked: root.removeCustomDie(modelData.name)
+              onClicked: root.rollFormula(modelData.formula, "macro:" + modelData.name)
             }
           }
         }
@@ -537,6 +430,289 @@ Panel {
                     font.strikeout: !modelData.kept
                   }
                 }
+              }
+            }
+          }
+        }
+
+        PanelSeparator { foreground: root.fg }
+
+        // ===================== Settings (collapsed) =====================
+        Button {
+          width: parent.width
+          leftAlign: true
+          text: "Settings"
+          iconText: root.settingsOpen ? "\uF0140" : "\uF0142"
+          foreground: root.fg
+          onClicked: root.settingsOpen = !root.settingsOpen
+        }
+
+        Column {
+          visible: root.settingsOpen
+          width: parent.width
+          spacing: Style.spacing.md
+
+          Toggle {
+            width: parent.width
+            label: "Sound"
+            description: "Play a sound when dice are rolled"
+            checked: root.soundEnabled
+            foreground: root.fg
+            fontFamily: root.fontFam
+            onClicked: { root.soundEnabled = !root.soundEnabled; root.saveState() }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.spacing.md
+            opacity: root.soundEnabled ? 1 : 0.4
+
+            Text {
+              text: "Volume"
+              color: Qt.darker(root.fg, 1.4)
+              font.family: root.fontFam
+              font.pixelSize: Style.font.bodySmall
+              anchors.verticalCenter: parent.verticalCenter
+              width: Style.space(64)
+            }
+
+            PanelSlider {
+              id: volSlider
+              width: parent.width - Style.space(64) - Style.spacing.md
+              bar: root.bar
+              value: root.volume
+              minimum: 0
+              maximum: 100
+              step: 1
+              integer: true
+              onMoved: function(v) { if (root.soundEnabled) root.volume = v }
+              onReleased: function(v) { if (root.soundEnabled) { root.volume = v; root.saveState() } }
+            }
+          }
+
+          PanelSeparator { foreground: root.fg }
+
+          PanelSectionHeader { text: "Macros"; foreground: root.fg; fontFamily: root.fontFam }
+
+          Row {
+            width: parent.width
+            spacing: Style.spacing.md
+
+            TextField {
+              width: parent.width * 0.38
+              placeholderText: "Name"
+              text: root.newMacroName
+              foreground: root.fg
+              onTextEdited: root.newMacroName = text
+              onAccepted: root.addMacro()
+            }
+
+            TextField {
+              width: parent.width * 0.62 - Style.spacing.md
+              placeholderText: "Formula, e.g. 2d20kh1"
+              text: root.newMacroFormula
+              foreground: root.fg
+              onTextEdited: root.newMacroFormula = text
+              onAccepted: root.addMacro()
+            }
+          }
+
+          Row {
+            width: parent.width
+            spacing: Style.spacing.md
+
+            Button {
+              text: "Add macro"
+              foreground: root.fg
+              onClicked: root.addMacro()
+            }
+
+            Text {
+              visible: root.macroError !== ""
+              text: root.macroError
+              textFormat: Text.PlainText
+              color: Color.urgent
+              font.family: root.fontFam
+              font.pixelSize: Style.font.bodySmall
+              anchors.verticalCenter: parent.verticalCenter
+            }
+          }
+
+          Repeater {
+            model: root.macros
+
+            Row {
+              required property var modelData
+              width: parent.width
+              spacing: Style.spacing.md
+
+              Column {
+                width: parent.width - removeMacroBtn.width - parent.spacing
+                spacing: Style.spacing.xxs
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                  text: Model.plainText(modelData.name)
+                  textFormat: Text.PlainText
+                  color: root.fg
+                  font.family: root.fontFam
+                  font.pixelSize: Style.font.body
+                  font.bold: true
+                  elide: Text.ElideRight
+                  width: parent.width
+                }
+
+                Text {
+                  text: Model.plainText(modelData.formula)
+                  textFormat: Text.PlainText
+                  color: Qt.darker(root.fg, 1.5)
+                  font.family: root.fontFam
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  width: parent.width
+                }
+              }
+
+              PanelActionButton {
+                id: removeMacroBtn
+                iconText: "×"
+                tooltipText: "Remove"
+                foreground: root.fg
+                hoverColor: Color.urgent
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: root.removeMacro(modelData.name)
+              }
+            }
+          }
+
+          PanelSeparator { foreground: root.fg }
+
+          PanelSectionHeader { text: "Custom dice"; foreground: root.fg; fontFamily: root.fontFam }
+
+          Button {
+            width: parent.width
+            leftAlign: true
+            text: "Add custom die"
+            iconText: root.addFormOpen ? "\uF0140" : "\uF0142"
+            foreground: root.fg
+            onClicked: root.addFormOpen = !root.addFormOpen
+          }
+
+          Column {
+            visible: root.addFormOpen
+            width: parent.width
+            spacing: Style.spacing.md
+
+            Row {
+              width: parent.width
+              spacing: Style.spacing.md
+
+              TextField {
+                id: nameField
+                width: parent.width * 0.42
+                placeholderText: "Name"
+                text: root.newName
+                foreground: root.fg
+                onTextEdited: root.newName = text
+              }
+
+              Dropdown {
+                id: typeDropdown
+                width: parent.width * 0.58 - Style.spacing.md
+                value: root.newType
+                options: [
+                  { value: "numeric", label: "Numeric (dN)" },
+                  { value: "sides", label: "Explicit sides" }
+                ]
+                foreground: root.fg
+                onChanged: function(v) { root.newType = v }
+              }
+            }
+
+            NumberField {
+              visible: root.newType === "numeric"
+              label: "Sides (1–1000000)"
+              value: root.newSides
+              from: 1
+              to: 1000000
+              stepSize: 1
+              foreground: root.fg
+              onModified: function(v) { root.newSides = v }
+            }
+
+            TextField {
+              visible: root.newType === "sides"
+              width: parent.width
+              placeholderText: "Sides, comma-separated (e.g. heads, tails)"
+              text: root.newSidesText
+              foreground: root.fg
+              onTextEdited: root.newSidesText = text
+            }
+
+            Row {
+              width: parent.width
+              spacing: Style.spacing.md
+
+              Button {
+                text: "Add die"
+                foreground: root.fg
+                onClicked: root.addCustomDie()
+              }
+
+              Text {
+                visible: root.formError !== ""
+                text: root.formError
+                color: Color.urgent
+                font.family: root.fontFam
+                font.pixelSize: Style.font.bodySmall
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+          }
+
+          Repeater {
+            model: root.customDice
+
+            Row {
+              required property var modelData
+              width: parent.width
+              spacing: Style.spacing.md
+
+              Column {
+                width: parent.width - removeBtn.width - parent.spacing
+                spacing: Style.spacing.xxs
+                anchors.verticalCenter: parent.verticalCenter
+
+                Text {
+                  text: Model.plainText(modelData.name)
+                  textFormat: Text.PlainText
+                  color: root.fg
+                  font.family: root.fontFam
+                  font.pixelSize: Style.font.body
+                  font.bold: true
+                  elide: Text.ElideRight
+                  width: parent.width
+                }
+
+                Text {
+                  text: Model.describeDie(modelData)
+                  textFormat: Text.PlainText
+                  color: Qt.darker(root.fg, 1.5)
+                  font.family: root.fontFam
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  width: parent.width
+                }
+              }
+
+              PanelActionButton {
+                id: removeBtn
+                iconText: "×"
+                tooltipText: "Remove"
+                foreground: root.fg
+                hoverColor: Color.urgent
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: root.removeCustomDie(modelData.name)
               }
             }
           }
