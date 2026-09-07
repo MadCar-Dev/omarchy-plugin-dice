@@ -10,8 +10,6 @@ Forked from Christopher Rueber's
 (MIT). The formula engine, macros, and per-die result traces are new; the
 hardened state handling and theme integration are his.
 
-![Dice panel](preview.png)
-
 ## Features
 
 - **Formula box** — type any expression and press Enter. Up/Down recall recent
