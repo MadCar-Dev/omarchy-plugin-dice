@@ -4,6 +4,7 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "Dice.js" as Dice
 
 // Dice roller panel: three sections — Settings (sound + custom dice),
 // Dice (roll buttons), Results (roll history). Clicking dice queues them and
@@ -27,13 +28,19 @@ Panel {
   readonly property color fg: bar ? bar.foreground : Color.foreground
   readonly property string fontFam: bar ? bar.fontFamily : Style.font.family
 
-  // ---- persisted state ----
+  // ---- persisted state (schema v2, see Model.js) ----
   property bool soundEnabled: true
   property int volume: 60
   property var customDice: []
+  property var macros: []
+  property var recent: []
 
-  readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/omarchy/rpgdice"
+  readonly property string stateDir: Quickshell.env("HOME") + "/.local/state/omarchy/dice"
   readonly property string stateFile: stateDir + "/state.json"
+  // First-run import source: the crueber.rpgdice state this plugin was forked from.
+  readonly property string legacyStateFile: Quickshell.env("HOME") + "/.local/state/omarchy/rpgdice/state.json"
+
+  function isValidFormula(text) { return Dice.parse(text).ok }
 
   // ---- dice ----
   readonly property var allDice: {
@@ -79,7 +86,9 @@ Panel {
   }
 
   function saveState() {
-    var json = Model.serializeState({ soundEnabled: soundEnabled, volume: volume, customDice: customDice })
+    var json = Model.serializeState({
+      soundEnabled: soundEnabled, volume: volume, customDice: customDice, macros: macros, recent: recent
+    })
     Util.execDetached("mkdir -p " + Util.shellQuote(stateDir)
       + " && t=$(mktemp -p " + Util.shellQuote(stateDir) + " .state.XXXXXX)"
       + " && printf '%s' " + Util.shellQuote(json) + " > \"$t\""
@@ -123,31 +132,36 @@ Panel {
   }
 
   function applyState(raw) {
-    var s = Model.parseState(raw)
+    var s = Model.parseState(raw, root.isValidFormula)
     root.soundEnabled = s.soundEnabled
     root.volume = s.volume
     root.customDice = s.customDice
+    root.macros = s.macros
+    root.recent = s.recent
   }
 
-  // Open state.json once and read from that descriptor only. `dd` refuses
-  // symlinks (iflag=nofollow), refuses to hang on a FIFO (iflag=nonblock), and
-  // `timeout` is the hard deadline if an open/read ever stalls. The read is
-  // capped at MAX_STATE_BYTES + 1 so an oversized or corrupt state.json can't
-  // force unbounded allocation (FileView would read the whole file first).
-  // Never stat/test the path and then cat it separately — the path can change
-  // in between, redirecting or hanging the read.
+  // Bounded read of state.json (see AGENTS.md): one dd open with
+  // iflag=nofollow,nonblock under `timeout`, capped at MAX_STATE_BYTES + 1.
+  // Falls back to the legacy rpgdice file on first run; output is prefixed
+  // with N (new) or L (legacy) so the panel knows whether to persist the import.
   Process {
     id: stateLoader
     command: ["bash", "-c",
-      'w="$1"; timeout ' + Model.STATE_READ_TIMEOUT_SECS
-      + ' dd if="$w" iflag=nofollow,nonblock bs=' + (Model.MAX_STATE_BYTES + 1)
-      + ' count=1 status=none 2>/dev/null',
-      "_", root.stateFile]
+      'r() { timeout ' + Model.STATE_READ_TIMEOUT_SECS
+      + ' dd if="$1" iflag=nofollow,nonblock bs=' + (Model.MAX_STATE_BYTES + 1)
+      + ' count=1 status=none 2>/dev/null; }; '
+      + 'out=$(r "$1"); if [ -n "$out" ]; then printf "N%s" "$out"; '
+      + 'else out=$(r "$2"); if [ -n "$out" ]; then printf "L%s" "$out"; fi; fi',
+      "_", root.stateFile, root.legacyStateFile]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
-        var raw = String(text || "")
-        root.applyState(raw.length > Model.MAX_STATE_BYTES ? "" : raw)
+        var t = String(text || "")
+        var source = t.charAt(0)
+        var raw = t.slice(1)
+        if (raw.length > Model.MAX_STATE_BYTES) raw = ""
+        root.applyState(raw)
+        if (source === "L") root.saveState()
       }
     }
     Component.onCompleted: running = true
