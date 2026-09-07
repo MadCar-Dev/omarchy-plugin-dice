@@ -49,34 +49,64 @@ Panel {
     return out
   }
 
-  // ---- roll queue (debounce) ----
-  property var pending: []
-  readonly property string pendingLabel: Model.pendingLabel(pending)
-
   // ---- results (newest first) ----
   property var history: []
 
-  function queueDie(die) {
-    pending = pending.concat([die])
-    debounceTimer.restart()
+  readonly property int maxHistory: 10
+
+  property string formulaText: ""
+  property string formulaError: ""
+  property int recentIndex: -1   // -1 = editing a fresh formula; 0.. = browsing recent
+
+  function pushHistory(entry) {
+    history = [entry].concat(history).slice(0, maxHistory)
+    if (soundEnabled) playSound()
   }
 
-  function rollAll() {
-    if (pending.length === 0) return
-    var dice = pending
-    pending = []
-    var results = []
-    var total = 0
-    var allNumeric = true
-    for (var i = 0; i < dice.length; i++) {
-      var r = Model.rollDie(dice[i])
-      results.push(r)
-      if (r.value === null) allNumeric = false
-      else total += r.value
+  // Evaluate a formula and record it. source: "formula" | "macro:<name>" | "die:<label>"
+  function rollFormula(text, source) {
+    var t = Model.plainText(text).replace(/^\s+|\s+$/g, "")
+    var r = Dice.evaluate(t, Dice.defaultRng)
+    if (!r.ok) {
+      formulaError = r.error + (r.column > 0 ? " at " + r.column : "")
+      return false
     }
-    history = [{ results: results, total: allNumeric ? total : null, time: Date.now() }]
-      .concat(history).slice(0, 5)
-    if (soundEnabled) playSound()
+    formulaError = ""
+    pushHistory({ formula: t, total: r.result.total, raw: r.result.raw, terms: r.result.terms, time: Date.now(), source: source })
+    if (source === "formula") {
+      recent = Model.pushRecent(recent, t)
+      recentIndex = -1
+      saveState()
+    }
+    return true
+  }
+
+  function submitFormula() {
+    if (rollFormula(formulaText, "formula")) formulaText = ""
+  }
+
+  // Dice buttons roll immediately. Numeric dice go through the formula path
+  // (so d20 becomes "1d20"); Fate rolls the standard 4dF; explicit-sides
+  // custom dice keep their faces-only result.
+  function rollDieButton(die) {
+    if (die.kind === "fate") { rollFormula("4dF", "die:dF"); return }
+    if (die.kind === "numeric") { rollFormula("1d" + die.sides, "die:" + die.label); return }
+    var r = Model.rollDie(die)
+    pushHistory({
+      formula: Model.plainText(die.label), total: null, raw: null, time: Date.now(), source: "die:" + die.label,
+      terms: [{ text: Model.plainText(die.label), sides: "custom", fate: false, total: null,
+                trace: [{ value: Model.plainText(r.display), kept: true, rerolled: false, exploded: false }] }]
+    })
+  }
+
+  // Up/Down in the formula box walk the recent list.
+  function recentStep(delta) {
+    if (recent.length === 0) return
+    var idx = recentIndex + delta
+    if (idx < -1) idx = -1
+    if (idx >= recent.length) idx = recent.length - 1
+    recentIndex = idx
+    formulaText = idx === -1 ? "" : recent[idx]
   }
 
   function playSound() {
@@ -167,12 +197,6 @@ Panel {
     Component.onCompleted: running = true
   }
 
-  Timer {
-    id: debounceTimer
-    interval: 1500
-    onTriggered: root.rollAll()
-  }
-
   KeyboardPanel {
     id: panel
     anchorItem: root.anchorItem
@@ -193,6 +217,31 @@ Panel {
         id: content
         width: parent.width
         spacing: Style.spacing.md
+
+        // ===================== Formula =====================
+        TextField {
+          id: formulaField
+          width: parent.width
+          placeholderText: "2d20kh1 + 5"
+          text: root.formulaText
+          foreground: root.fg
+          onTextEdited: { root.formulaText = text; root.recentIndex = -1 }
+          onAccepted: root.submitFormula()
+          Keys.onUpPressed: root.recentStep(1)
+          Keys.onDownPressed: root.recentStep(-1)
+          Keys.onEscapePressed: root.close()
+        }
+
+        Text {
+          visible: root.formulaError !== ""
+          width: parent.width
+          text: root.formulaError
+          textFormat: Text.PlainText
+          color: Color.urgent
+          font.family: root.fontFam
+          font.pixelSize: Style.font.bodySmall
+          wrapMode: Text.WordWrap
+        }
 
         // ===================== Settings =====================
         PanelSectionHeader { text: "Settings"; foreground: root.fg; fontFamily: root.fontFam }
@@ -386,18 +435,9 @@ Panel {
               width: (diceGrid.width - diceGrid.spacing * (diceGrid.columns - 1)) / diceGrid.columns
               text: Model.plainText(modelData.label)
               foreground: root.fg
-              onClicked: root.queueDie(modelData)
+              onClicked: root.rollDieButton(modelData)
             }
           }
-        }
-
-        Text {
-          visible: root.pending.length > 0
-          text: "Rolling: " + root.pendingLabel
-          textFormat: Text.PlainText
-          color: Color.accent
-          font.family: root.fontFam
-          font.pixelSize: Style.font.bodySmall
         }
 
         PanelSeparator { foreground: root.fg }
