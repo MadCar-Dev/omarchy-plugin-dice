@@ -223,15 +223,24 @@ Panel {
 
   // Bounded read of state.json (see AGENTS.md): one dd open with
   // iflag=nofollow,nonblock under `timeout`, capped at MAX_STATE_BYTES + 1.
-  // Falls back to the legacy rpgdice file on first run; output is prefixed
-  // with N (new) or L (legacy) so the panel knows whether to persist the import.
+  // The legacy rpgdice import only runs when the new state file is absent —
+  // existence is tested with `-e` *before* attempting the read, so an
+  // existing-but-unreadable new file never falls through to the legacy
+  // import. Output carries one marker byte:
+  //   N - new file exists, read succeeded (bytes follow)      -> apply
+  //   E - new file exists, read failed/empty                  -> apply defaults, no save
+  //   L - new file absent, legacy file read (bytes follow)     -> apply + save (import)
+  //   (none) - neither file exists                             -> apply defaults, no save
+  // Note: `-e` on a symlink to a missing target is false, and a symlink to
+  // an existing file is refused by iflag=nofollow — both land on E, so
+  // nothing is ever written from a symlinked state.json.
   Process {
     id: stateLoader
     command: ["bash", "-c",
       'r() { timeout ' + Model.STATE_READ_TIMEOUT_SECS
       + ' dd if="$1" iflag=nofollow,nonblock bs=' + (Model.MAX_STATE_BYTES + 1)
       + ' count=1 status=none 2>/dev/null; }; '
-      + 'out=$(r "$1"); if [ -n "$out" ]; then printf "N%s" "$out"; '
+      + 'if [ -e "$1" ]; then out=$(r "$1"); if [ -n "$out" ]; then printf "N%s" "$out"; else printf "E"; fi; '
       + 'else out=$(r "$2"); if [ -n "$out" ]; then printf "L%s" "$out"; fi; fi',
       "_", root.stateFile, root.legacyStateFile]
     stdout: StdioCollector {
@@ -241,6 +250,7 @@ Panel {
         var source = t.charAt(0)
         var raw = t.slice(1)
         if (raw.length > Model.MAX_STATE_BYTES) raw = ""
+        if (source === "E") { root.applyState(""); return }
         root.applyState(raw)
         if (source === "L") root.saveState()
       }
