@@ -6,9 +6,9 @@ import qs.Ui
 import "Model.js" as Model
 import "Dice.js" as Dice
 
-// Dice roller panel: three sections — Settings (sound + custom dice),
-// Dice (roll buttons), Results (roll history). Clicking dice queues them and
-// a 1.5s debounce rolls everything queued at once.
+// Dice roller panel: formula box (with macros, coming) and dice buttons that
+// roll immediately on click, plus Settings (sound + custom dice) and Results
+// (per-die roll history) sections.
 Panel {
   id: root
   moduleName: "madcar.dice"
@@ -61,6 +61,22 @@ Panel {
   function pushHistory(entry) {
     history = [entry].concat(history).slice(0, maxHistory)
     if (soundEnabled) playSound()
+  }
+
+  // One die's label: compound faces "6+6+2", Fate "- 0 +", plus "!" when exploded.
+  function dieText(die, term) {
+    var s
+    if (die.faces) s = die.faces.join("+")
+    else if (term.fate) s = Dice.fateFace(die.value)
+    else s = String(die.value)
+    if (die.exploded) s += "!"
+    return s
+  }
+
+  function dieColor(die) {
+    if (!die.kept) return Qt.darker(root.fg, 1.8)
+    if (die.exploded) return Color.accent
+    return root.fg
   }
 
   // Evaluate a formula and record it. source: "formula" | "macro:<name>" | "die:<label>"
@@ -458,32 +474,69 @@ Panel {
           model: root.history
 
           Column {
+            id: entryItem
             required property var modelData
+            readonly property var entry: modelData
             width: parent.width
-            spacing: Style.spacing.xs
+            spacing: Style.spacing.xxs
 
             Row {
               width: parent.width
               spacing: Style.spacing.sm
 
               Text {
-                text: Model.groupLabel(modelData)
+                text: entryItem.entry.formula
                 textFormat: Text.PlainText
                 color: root.fg
                 font.family: root.fontFam
                 font.pixelSize: Style.font.body
-                wrapMode: Text.WordWrap
-                width: parent.width - (modelData.total !== null ? Style.space(70) : 0)
+                elide: Text.ElideRight
+                width: parent.width - (entryItem.entry.total !== null ? Style.space(70) : 0) - parent.spacing
               }
 
               Text {
-                visible: modelData.total !== null
-                text: "= " + modelData.total
+                visible: entryItem.entry.total !== null
+                text: "= " + entryItem.entry.total
                 color: Color.accent
                 font.family: root.fontFam
                 font.pixelSize: Style.font.body
                 font.bold: true
                 anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+
+            Repeater {
+              model: entryItem.entry.terms
+
+              Flow {
+                id: termItem
+                required property var modelData
+                readonly property var term: modelData
+                width: parent.width
+                spacing: Style.spacing.xs
+
+                Text {
+                  visible: entryItem.entry.terms.length > 1 || termItem.term.text !== entryItem.entry.formula
+                  text: termItem.term.text + ":"
+                  textFormat: Text.PlainText
+                  color: Qt.darker(root.fg, 1.5)
+                  font.family: root.fontFam
+                  font.pixelSize: Style.font.bodySmall
+                }
+
+                Repeater {
+                  model: termItem.term.trace
+
+                  Text {
+                    required property var modelData
+                    text: root.dieText(modelData, termItem.term)
+                    textFormat: Text.PlainText
+                    color: root.dieColor(modelData)
+                    font.family: root.fontFam
+                    font.pixelSize: Style.font.bodySmall
+                    font.strikeout: !modelData.kept
+                  }
+                }
               }
             }
           }
