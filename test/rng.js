@@ -3,13 +3,21 @@
 // rng(sides) -> integer 1..sides. Two deterministic providers for tests.
 
 // Returns the given faces in order; throws if a test rolls more dice than it
-// scripted, so a bug that rolls extra dice fails loudly.
+// scripted, so a bug that rolls extra dice fails loudly. The thrown errors
+// are dice-tagged ({ dice: true, error, column }), the same shape Dice.js's
+// own parser/evaluator errors use, so Dice.evaluate's catch recognizes them
+// and surfaces the message instead of masking it as "Could not roll
+// formula". A test that expects { ok: true, ... } but under-scripts its rng
+// (or scripts a face outside 1..sides) fails with that message
+// ("scripted rng exhausted" / "scripted face N outside 1..sides") rather
+// than a generic one, and rerolls/explodes still deduct against the same
+// per-die budget checked in Dice.js's own limit tests.
 function scripted(values) {
   var queue = values.slice()
   function rng(sides) {
-    if (queue.length === 0) throw new Error("scripted rng exhausted (sides=" + sides + ")")
+    if (queue.length === 0) throw { dice: true, error: "scripted rng exhausted", column: 0 }
     var v = queue.shift()
-    if (v < 1 || v > sides) throw new Error("scripted face " + v + " outside 1.." + sides)
+    if (v < 1 || v > sides) throw { dice: true, error: "scripted face " + v + " outside 1.." + sides, column: 0 }
     rng.calls.push(sides)
     return v
   }

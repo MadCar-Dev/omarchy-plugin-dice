@@ -321,3 +321,39 @@ test("parse: comparison operators survive intact (panel must not run formulas th
     assert.equal(c.pick(p.ast), c.op, c.formula)
   }
 })
+
+test("parse: a formula of exactly 200 characters is accepted", () => {
+  const formula = "1+".repeat(99) + "10"
+  assert.equal(formula.length, 200)
+  const p = Dice.parse(formula)
+  assert.equal(p.ok, true)
+})
+
+test("roll: 2d6!!kh1 keeps the compounded die over the plain one", () => {
+  const r = Dice.evaluate("2d6!!kh1", scripted([6, 6, 2, 4])).result
+  assert.deepEqual(r.terms[0].trace, [
+    { value: 14, kept: true, rerolled: false, exploded: true, faces: [6, 6, 2] },
+    { value: 4, kept: false, rerolled: false, exploded: false }
+  ])
+  assert.equal(r.total, 14)
+})
+
+test("parse: bare k with no explicit count means kh1", () => {
+  assert.deepEqual(Dice.parse("d6k").ast.keep, { mode: "kh", count: 1 })
+})
+
+test("evaluate: literal 0 totals zero", () => {
+  assert.equal(Dice.evaluate("0").result.total, 0)
+})
+
+test("evaluate: unary minus on a dice term", () => {
+  assert.equal(Dice.evaluate("-d6", scripted([4])).result.total, -4)
+})
+
+test("evaluate: multiplication by a negative number", () => {
+  assert.equal(Dice.evaluate("d6*-1", scripted([3])).result.total, -3)
+})
+
+test("parse: whitespace cannot separate a dice term from its modifiers", () => {
+  assert.deepEqual(Dice.parse("3d6 kh1"), { ok: false, error: 'Unexpected "k"', column: 5 })
+})
