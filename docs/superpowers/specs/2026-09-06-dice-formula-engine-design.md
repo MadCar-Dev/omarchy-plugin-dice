@@ -65,7 +65,9 @@ reroll   := ('r' | 'ro') compare
 compare  := ['>' | '<' | '>=' | '<=' | '='] integer
 ```
 
-- Whitespace is ignored between tokens. Input is case-insensitive.
+- Whitespace may separate numbers, dice terms, operators and parentheses; it
+  may not appear inside a dice term (`3d6 kh1` is an error). Input is
+  case-insensitive.
 - `count` defaults to 1. `d%` is `d100`. `dF` has faces `-1, 0, +1`.
 - Bare `k` means `kh`; bare `d` means `dl` (Roll20). Missing keep/drop count
   defaults to 1.
@@ -169,7 +171,10 @@ hardcoded values. User text through `Model.plainText` with
 - **Import**: on first run, if `~/.local/state/omarchy/dice/state.json` is
   absent and `~/.local/state/omarchy/rpgdice/state.json` exists, read it
   (same bounded reader), take sound/volume/customDice, write v2. The old file
-  is left in place.
+  is left in place. The import runs **only** when the new file does not
+  exist: an existing-but-unreadable `state.json` leaves the in-memory model
+  at defaults and writes nothing, rather than falling through to the legacy
+  import.
 
 ## Repo, packaging, install
 
@@ -197,7 +202,7 @@ hardcoded values. User text through `Model.plainText` with
   that QML ignores (documented in AGENTS.md).
 - Scripted rng (exact faces) plus seeded mulberry32 for volume tests. Coverage, at minimum:
   - parse: every grammar production; case-insensitivity; whitespace; errors
-    with correct column for `4d`, `d6k`, `2d20kh1kh1` (a second keep is a
+    with correct column for `4d`, `2d20kh1kh1` (a second keep is a
     parse error), `dF!`, unbalanced parens, over-length input.
   - roll: `4d6dl1` drops exactly the lowest and total matches the kept three;
     `2d20kh1`; `kl`/`dh`; `!` chain length with seeded forcing; `!!` compounds
