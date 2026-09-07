@@ -69,7 +69,9 @@ function assetPath(url) {
 
 // ---- state ----
 
-var DEFAULT_STATE = { soundEnabled: true, volume: 60, customDice: [] }
+// Schema v2. v1 files (no `version`, no macros/recent) load as v2 with
+// empty macros and recent lists.
+var DEFAULT_STATE = { version: 2, soundEnabled: true, volume: 60, customDice: [], macros: [], recent: [] }
 
 // Hard bounds on persisted state. The file is a tiny config blob, so anything
 // beyond these limits is garbage — refusing to grow the in-memory model past
@@ -78,6 +80,10 @@ var DEFAULT_STATE = { soundEnabled: true, volume: 60, customDice: [] }
 var MAX_STATE_BYTES = 65536
 var MAX_CUSTOM_DICE = 128
 var MAX_SIDES = 256
+var MAX_MACROS = 64
+var MAX_MACRO_NAME = 32
+var MAX_FORMULA = 200
+var MAX_RECENT = 20
 // dd open/read deadline (seconds) for state.json — bounds a stalled read.
 var STATE_READ_TIMEOUT_SECS = 5
 
@@ -87,13 +93,15 @@ function clampVolume(v) {
   return Math.max(0, Math.min(100, Math.round(n)))
 }
 
+function trim(s) { return String(s).replace(/^\s+|\s+$/g, "") }
+
 function sanitizeCustomDice(list) {
   if (!Array.isArray(list)) return []
   var out = []
   for (var i = 0; i < list.length && out.length < MAX_CUSTOM_DICE; i++) {
     var d = list[i]
     if (!d || typeof d !== "object") continue
-    var name = plainText(d.name).replace(/^\s+|\s+$/g, "")
+    var name = trim(plainText(d.name))
     if (!name) continue
     if (d.kind === "sides") {
       var src = Array.isArray(d.sides) ? d.sides : []
@@ -111,15 +119,58 @@ function sanitizeCustomDice(list) {
   return out
 }
 
-function parseState(raw) {
+// Macros: { name, formula }. `isValid(formula)` is injected (Dice.parse in
+// the panel) so this file stays free of QML imports and testable alone.
+function sanitizeMacros(list, isValid) {
+  if (!Array.isArray(list)) return []
+  var out = []
+  var seen = {}
+  for (var i = 0; i < list.length && out.length < MAX_MACROS; i++) {
+    var m = list[i]
+    if (!m || typeof m !== "object") continue
+    var name = trim(plainText(m.name)).slice(0, MAX_MACRO_NAME)
+    if (!name || seen[name]) continue
+    var formula = typeof m.formula === "string" ? trim(m.formula) : ""
+    if (!formula || formula.length > MAX_FORMULA || !isValid(formula)) continue
+    seen[name] = true
+    out.push({ name: name, formula: formula })
+  }
+  return out
+}
+
+function sanitizeRecent(list, isValid) {
+  if (!Array.isArray(list)) return []
+  var out = []
+  for (var i = 0; i < list.length && out.length < MAX_RECENT; i++) {
+    var f = list[i]
+    if (typeof f !== "string") continue
+    f = trim(f)
+    if (!f || f.length > MAX_FORMULA || !isValid(f)) continue
+    out.push(f)
+  }
+  return out
+}
+
+// Newest first, no duplicates, at most MAX_RECENT.
+function pushRecent(recent, formula) {
+  var out = [formula]
+  for (var i = 0; i < recent.length && out.length < MAX_RECENT; i++)
+    if (recent[i] !== formula) out.push(recent[i])
+  return out
+}
+
+function parseState(raw, isValid) {
   var s = DEFAULT_STATE
   try {
     var parsed = JSON.parse(String(raw || ""))
-    if (parsed && typeof parsed === "object") {
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       s = {
+        version: 2,
         soundEnabled: parsed.soundEnabled !== false,
         volume: clampVolume(parsed.volume),
-        customDice: sanitizeCustomDice(parsed.customDice)
+        customDice: sanitizeCustomDice(parsed.customDice),
+        macros: sanitizeMacros(parsed.macros, isValid),
+        recent: sanitizeRecent(parsed.recent, isValid)
       }
     }
   } catch (e) {}
@@ -128,9 +179,12 @@ function parseState(raw) {
 
 function serializeState(s) {
   return JSON.stringify({
+    version: 2,
     soundEnabled: s.soundEnabled === true,
     volume: clampVolume(s.volume),
-    customDice: s.customDice || []
+    customDice: s.customDice || [],
+    macros: s.macros || [],
+    recent: s.recent || []
   })
 }
 
@@ -147,29 +201,15 @@ function describeDie(def) {
   return "d" + def.sides
 }
 
-// "d20 + d6" for the pending queue.
-function pendingLabel(pending) {
-  var parts = []
-  for (var i = 0; i < pending.length; i++) parts.push(pending[i].label)
-  return parts.join(" + ")
-}
-
-// "d6: 3, 4, 5   d8: 8" — same-type dice grouped, values comma-separated.
-function groupLabel(group) {
-  var labels = []
-  var buckets = []
-  for (var i = 0; i < group.results.length; i++) {
-    var r = group.results[i]
-    var idx = labels.indexOf(r.label)
-    if (idx === -1) {
-      labels.push(r.label)
-      buckets.push([])
-      idx = buckets.length - 1
-    }
-    buckets[idx].push(r.display)
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    STANDARD_DICE: STANDARD_DICE, FATE_DIE: FATE_DIE, rollDie: rollDie, parseSides: parseSides,
+    plainText: plainText, assetPath: assetPath, DEFAULT_STATE: DEFAULT_STATE,
+    MAX_STATE_BYTES: MAX_STATE_BYTES, MAX_CUSTOM_DICE: MAX_CUSTOM_DICE, MAX_SIDES: MAX_SIDES,
+    MAX_MACROS: MAX_MACROS, MAX_MACRO_NAME: MAX_MACRO_NAME, MAX_FORMULA: MAX_FORMULA, MAX_RECENT: MAX_RECENT,
+    STATE_READ_TIMEOUT_SECS: STATE_READ_TIMEOUT_SECS, clampVolume: clampVolume,
+    sanitizeCustomDice: sanitizeCustomDice, sanitizeMacros: sanitizeMacros, sanitizeRecent: sanitizeRecent,
+    pushRecent: pushRecent, parseState: parseState, serializeState: serializeState,
+    customDie: customDie, describeDie: describeDie
   }
-  var parts = []
-  for (var j = 0; j < labels.length; j++)
-    parts.push(labels[j] + ": " + buckets[j].join(", "))
-  return parts.join("   ")
 }
