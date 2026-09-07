@@ -80,3 +80,27 @@ test("removed helpers are gone", () => {
   assert.equal(Model.pendingLabel, undefined)
   assert.equal(Model.groupLabel, undefined)
 })
+
+test("parseState: single-face custom dice whose face is a formula become macros", () => {
+  const raw = JSON.stringify({
+    customDice: [
+      { name: "Adv", kind: "sides", sides: ["2d20kh1"] },
+      { name: "coin", kind: "sides", sides: ["heads", "tails"] },
+      { name: "six", kind: "sides", sides: ["6"] },
+      { name: "d7", kind: "numeric", sides: 7 }
+    ],
+    macros: [{ name: "Adv", formula: "1d20" }]
+  })
+  const s = Model.parseState(raw, isValid)
+  // Adv already exists as a macro: the macro wins, the die is dropped
+  assert.deepEqual(s.macros, [{ name: "Adv", formula: "1d20" }])
+  // a plain number face is not a dice formula; multi-face and numeric dice stay dice
+  assert.deepEqual(s.customDice, [
+    { name: "coin", kind: "sides", sides: ["heads", "tails"] },
+    { name: "six", kind: "sides", sides: ["6"] },
+    { name: "d7", kind: "numeric", sides: 7 }
+  ])
+  const t = Model.parseState(JSON.stringify({ customDice: [{ name: "stats", kind: "sides", sides: [" 4d6dl1 "] }] }), isValid)
+  assert.deepEqual(t.macros, [{ name: "stats", formula: "4d6dl1" }])
+  assert.deepEqual(t.customDice, [])
+})

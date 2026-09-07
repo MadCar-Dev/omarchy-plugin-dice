@@ -159,6 +159,27 @@ function pushRecent(recent, formula) {
   return out
 }
 
+// rpgdice had no macros, so people faked them as explicit-sides dice with one
+// face holding a formula ("Adv" → ["2d20kh1"]). Promote those to macros on
+// load: one face, parses as a formula, and actually contains a dice term (a
+// bare number stays a die). An existing macro of the same name wins.
+function promoteFormulaDice(customDice, macros, isValid) {
+  var outDice = []
+  var outMacros = macros.slice()
+  var names = Object.create(null)
+  for (var m = 0; m < outMacros.length; m++) names[outMacros[m].name] = true
+  for (var i = 0; i < customDice.length; i++) {
+    var d = customDice[i]
+    var face = d.kind === "sides" && d.sides.length === 1 ? trim(d.sides[0]) : ""
+    var isFormula = face !== "" && face.length <= MAX_FORMULA && /d/i.test(face) && isValid(face)
+    if (!isFormula) { outDice.push(d); continue }
+    if (names[d.name] || outMacros.length >= MAX_MACROS) continue
+    names[d.name] = true
+    outMacros.push({ name: d.name, formula: face })
+  }
+  return { customDice: outDice, macros: outMacros }
+}
+
 function parseState(raw, isValid) {
   // A fresh object every call — never the shared DEFAULT_STATE — so a
   // caller mutating the returned state (or its arrays) can't corrupt the
@@ -167,12 +188,14 @@ function parseState(raw, isValid) {
   try {
     var parsed = JSON.parse(String(raw || ""))
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      var promoted = promoteFormulaDice(
+        sanitizeCustomDice(parsed.customDice), sanitizeMacros(parsed.macros, isValid), isValid)
       s = {
         version: 2,
         soundEnabled: parsed.soundEnabled !== false,
         volume: clampVolume(parsed.volume),
-        customDice: sanitizeCustomDice(parsed.customDice),
-        macros: sanitizeMacros(parsed.macros, isValid),
+        customDice: promoted.customDice,
+        macros: promoted.macros,
         recent: sanitizeRecent(parsed.recent, isValid)
       }
     }
@@ -212,7 +235,7 @@ if (typeof module !== "undefined" && module.exports) {
     MAX_MACROS: MAX_MACROS, MAX_MACRO_NAME: MAX_MACRO_NAME, MAX_FORMULA: MAX_FORMULA, MAX_RECENT: MAX_RECENT,
     STATE_READ_TIMEOUT_SECS: STATE_READ_TIMEOUT_SECS, clampVolume: clampVolume,
     sanitizeCustomDice: sanitizeCustomDice, sanitizeMacros: sanitizeMacros, sanitizeRecent: sanitizeRecent,
-    pushRecent: pushRecent, parseState: parseState, serializeState: serializeState,
+    pushRecent: pushRecent, promoteFormulaDice: promoteFormulaDice, parseState: parseState, serializeState: serializeState,
     customDie: customDie, describeDie: describeDie
   }
 }

@@ -92,3 +92,6 @@ notation depends on (`2d6r<2`).
   formula ≤ 200, 20 recent.
 - `parseState(raw, isValid)` takes the formula validator as a parameter so
   `Model.js` never imports `Dice.js`.
+- On load, an explicit-sides custom die with exactly one face that parses as a
+  dice formula (rpgdice's macro workaround, e.g. `Adv` → `["2d20kh1"]`) is promoted
+  to a macro of the same name (`promoteFormulaDice`). Existing macro names win.
