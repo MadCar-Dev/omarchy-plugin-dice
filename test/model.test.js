@@ -22,6 +22,13 @@ test("parseState: garbage and empty input give defaults", () => {
   assert.deepEqual(Model.parseState("[]", isValid), Model.DEFAULT_STATE)
 })
 
+test("parseState: defaults are a fresh copy, not the shared DEFAULT_STATE object", () => {
+  const s = Model.parseState("", isValid)
+  assert.notEqual(s, Model.DEFAULT_STATE)
+  assert.notEqual(s.customDice, Model.DEFAULT_STATE.customDice)
+  assert.deepEqual(s, Model.DEFAULT_STATE)
+})
+
 test("sanitizeMacros: trims, strips markup, validates formulas, dedupes, caps", () => {
   const list = [
     { name: "  Advantage ", formula: "2d20kh1" },

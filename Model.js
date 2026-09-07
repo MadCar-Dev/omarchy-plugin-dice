@@ -124,7 +124,7 @@ function sanitizeCustomDice(list) {
 function sanitizeMacros(list, isValid) {
   if (!Array.isArray(list)) return []
   var out = []
-  var seen = {}
+  var seen = Object.create(null)
   for (var i = 0; i < list.length && out.length < MAX_MACROS; i++) {
     var m = list[i]
     if (!m || typeof m !== "object") continue
@@ -160,7 +160,10 @@ function pushRecent(recent, formula) {
 }
 
 function parseState(raw, isValid) {
-  var s = DEFAULT_STATE
+  // A fresh object every call — never the shared DEFAULT_STATE — so a
+  // caller mutating the returned state (or its arrays) can't corrupt the
+  // module-level default for every other caller.
+  var s = { version: 2, soundEnabled: true, volume: 60, customDice: [], macros: [], recent: [] }
   try {
     var parsed = JSON.parse(String(raw || ""))
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {

@@ -6,9 +6,10 @@ import qs.Ui
 import "Model.js" as Model
 import "Dice.js" as Dice
 
-// Dice roller panel: formula box (with macros, coming) and dice buttons that
-// roll immediately on click, plus Settings (sound + custom dice) and Results
-// (per-die roll history) sections.
+// Dice roller panel: a formula box (Roll20/Foundry notation via Dice.js),
+// saved macros as one-click buttons, standard/Fate/custom dice that roll
+// immediately on click, per-die Results history, and a collapsible Settings
+// section (sound, macros, custom dice).
 Panel {
   id: root
   moduleName: "madcar.dice"

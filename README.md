@@ -10,8 +10,6 @@ Forked from Christopher Rueber's
 (MIT). The formula engine, macros, and per-die result traces are new; the
 hardened state handling and theme integration are his.
 
-![Dice panel](preview.png)
-
 ## Features
 
 - **Formula box** — type any expression and press Enter. Up/Down recall recent
@@ -45,8 +43,8 @@ hardened state handling and theme integration are his.
 | `> < >= <= =` | targets for `!` and `r` | `d6!>4`, `d10r<=2` |
 
 Modifiers apply in Roll20 order: reroll, then explode, then keep/drop. Limits:
-200 characters, 1000 dice per term, 16 nested parentheses, 100 rerolls or
-explosions per starting die.
+200 characters, 1000 dice per term including rerolled and exploded dice,
+16 nested parentheses, 100 rerolls or explosions per starting die.
 
 ## Installation
 
